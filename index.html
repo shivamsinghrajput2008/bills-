@@ -1,0 +1,1166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SUPER BACHAT BAZZAR - Modern Billing & Inventory POS</title>
+  <meta name="description" content="Fast, Modern Billing and Inventory Management Point of Sale System for Super Bachat Bazzar, Attardah Kachhi Pakki, Muzaffarpur.">
+  
+  <!-- Modern Google Fonts: Outfit & Inter + JetBrains Mono for receipts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Outfit:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+  <!-- JsBarcode for barcode rendering -->
+  <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
+  <!-- QRCode.js for dynamic UPI QR generation -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <!-- HTML5-QRCode for live webcam barcode scanning -->
+  <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+  <!-- Canvas Confetti for checkout celebrations -->
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.2/dist/confetti.browser.min.js"></script>
+  
+  <link rel="stylesheet" href="style.css">
+</head>
+<body class="theme-light">
+  <!-- Audio Beep Generator & Sound Effects -->
+  <div id="toast-container" class="toast-container" aria-live="polite"></div>
+
+  <!-- Top App Navigation & Store Banner -->
+  <header class="app-header">
+    <!-- Left: Store Name & All 5 Nav Options in a Row -->
+    <div class="header-left">
+      <div class="store-badge-icon">
+        <i data-lucide="shopping-bag"></i>
+      </div>
+      <div class="store-info-group">
+        <div class="store-name-row">
+          <h1 class="store-title">SUPER BACHAT BAZZAR</h1>
+          <span class="pos-status-pill"><span class="pulse-dot"></span> POS LIVE</span>
+        </div>
+        <p class="store-subtitle"><i data-lucide="map-pin" class="mini-icon"></i> Attardah Kachhi Pakki, Muzaffarpur</p>
+      </div>
+
+      <!-- All 5 Navigation Options in Left Row -->
+      <nav class="nav-tabs" role="tablist">
+        <button class="nav-tab active" data-tab="pos" id="tab-pos-btn">
+          <i data-lucide="shopping-cart"></i>
+          <span>New Sale</span>
+          <kbd class="shortcut-kbd">F2</kbd>
+        </button>
+        <button class="nav-tab" data-tab="inventory" id="tab-inventory-btn">
+          <i data-lucide="boxes"></i>
+          <span>Add Items & Products</span>
+          <span class="counter-badge" id="nav-item-count">0</span>
+        </button>
+        <button class="nav-tab" data-tab="history" id="tab-history-btn">
+          <i data-lucide="book-open"></i>
+          <span>Sales Book</span>
+          <span class="counter-badge" id="nav-bill-count">0</span>
+        </button>
+        <button class="nav-tab" data-tab="analytics" id="tab-analytics-btn">
+          <i data-lucide="trending-up"></i>
+          <span>Sale Analysis</span>
+        </button>
+        <button class="nav-tab" data-tab="settings" id="tab-settings-btn">
+          <i data-lucide="store"></i>
+          <span>Store Settings</span>
+        </button>
+      </nav>
+    </div>
+
+    <!-- Center: Store Front Photo Badge -->
+    <div class="header-center-photo">
+      <img src="store-photo.jpg" alt="Super Bachat Bazaar Store Front" class="store-header-img" title="Super Bachat Bazaar Store Front">
+    </div>
+
+    <!-- Right: Clock & Action Icons -->
+    <div class="header-right">
+      <div class="live-clock" id="live-clock">
+        <i data-lucide="clock" class="clock-icon"></i>
+        <div class="clock-text">
+          <span class="clock-time" id="clock-time">12:00:00 PM</span>
+          <span class="clock-date" id="clock-date">01 Sep 2026</span>
+        </div>
+      </div>
+      <button class="action-btn icon-btn" id="sound-toggle-btn" title="Toggle Beep Sound">
+        <i data-lucide="volume-2" id="sound-icon"></i>
+      </button>
+      <button class="action-btn icon-btn" id="theme-toggle-btn" title="Toggle Dark/Light Mode">
+        <i data-lucide="moon" id="theme-icon"></i>
+      </button>
+    </div>
+  </header>
+
+  <!-- Quick Shortcut Bar -->
+  <div class="shortcut-bar">
+    <div class="shortcut-item"><kbd>F4</kbd> Focus Barcode</div>
+    <div class="shortcut-item"><kbd>F9</kbd> Scan with Camera</div>
+    <div class="shortcut-item"><kbd>F8</kbd> Quick Checkout</div>
+    <div class="shortcut-item"><kbd>Ctrl+P</kbd> Print Last Bill</div>
+    <div class="shortcut-item"><kbd>Esc</kbd> Close Popup</div>
+    <div class="store-tagline">✨ Super Bachat, Super Khushiyan! Wholesale Rates on Retail Items ✨</div>
+  </div>
+
+  <!-- Main View Container -->
+  <main class="main-container">
+    
+    <!-- TAB 1: POS BILLING COUNTER -->
+    <section id="view-pos" class="view-section active">
+      <div class="pos-layout">
+        
+        <!-- POS Left Column: Customer details 1st row, Clean Cart Table 2nd row -->
+        <div class="pos-left-panel">
+          
+          <!-- 1st Row: Customer Name & Mobile No. -->
+          <div class="pos-card customer-card" style="margin-bottom: 16px;">
+            <div class="pos-card-header">
+              <i data-lucide="user-check"></i>
+              <span>Customer Information</span>
+            </div>
+            <div class="customer-inputs-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+              <div class="form-group-compact">
+                <label for="cust-name-input"><i data-lucide="user"></i> Customer Name</label>
+                <input type="text" id="cust-name-input" class="form-input-compact" placeholder="Cash Customer / Guest">
+              </div>
+              <div class="form-group-compact">
+                <label for="cust-phone-input"><i data-lucide="phone"></i> Mobile No. (WhatsApp)</label>
+                <input type="tel" id="cust-phone-input" class="form-input-compact" placeholder="10-digit mobile number">
+              </div>
+            </div>
+          </div>
+
+          <!-- Rapid Barcode / Search Box -->
+          <div class="scan-search-card" style="margin-bottom: 16px;">
+            <div class="scanner-input-wrapper">
+              <div class="scanner-icon">
+                <i data-lucide="scan-barcode"></i>
+              </div>
+              <input 
+                type="text" 
+                id="barcode-input" 
+                class="barcode-input" 
+                placeholder="Type product name or scan barcode to add item..." 
+                autocomplete="off"
+                autofocus
+              >
+              <button class="btn btn-secondary btn-sm" id="open-cam-scanner-btn" title="Scan using Camera (F9)">
+                <i data-lucide="camera"></i>
+                <span>Camera Scan</span>
+              </button>
+            </div>
+            <div class="search-suggestions" id="search-suggestions" style="display: none;"></div>
+          </div>
+
+          <!-- 2nd Row: Cart Items Table -->
+          <div class="cart-table-card">
+            <div class="card-header-row">
+              <div class="cart-title-group">
+                <h2 class="card-title">
+                  <i data-lucide="shopping-cart"></i>
+                  Bill Items List
+                </h2>
+                <span class="cart-badge" id="cart-item-count">0 items</span>
+              </div>
+              <div class="cart-actions-group">
+                <button class="btn btn-outline-danger btn-xs" id="clear-cart-btn">
+                  <i data-lucide="trash-2"></i> Clear Items
+                </button>
+              </div>
+            </div>
+
+            <div class="cart-table-container">
+              <table class="cart-table" id="cart-table">
+                <thead>
+                  <tr>
+                    <th style="width: 40px;">#</th>
+                    <th>Product Name</th>
+                    <th style="width: 110px;">MRP (₹)</th>
+                    <th style="width: 110px;">Rate (₹)</th>
+                    <th style="width: 140px; text-align: center;">Quantity</th>
+                    <th style="width: 120px; text-align: right;">Total (₹)</th>
+                    <th style="width: 90px; text-align: right;">Savings</th>
+                    <th style="width: 50px; text-align: center;">Action</th>
+                  </tr>
+                </thead>
+                <tbody id="cart-table-body">
+                  <!-- Empty Cart state or populated rows -->
+                </tbody>
+              </table>
+
+              <div class="empty-cart-state" id="empty-cart-state">
+                <div class="empty-icon-circle">
+                  <i data-lucide="shopping-basket"></i>
+                </div>
+                <h3>No items in current bill</h3>
+                <p>Type a product name or scan a barcode above to add items to this sale.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- POS Right Column: Total Summary & Bottom Right Save & Bill Buttons -->
+        <div class="pos-right-panel">
+          
+          <!-- Total Savings Banner -->
+          <div class="savings-banner" id="savings-banner">
+            <div class="savings-badge-icon">
+              <i data-lucide="sparkles"></i>
+            </div>
+            <div class="savings-text-group">
+              <span class="savings-label">SUPER BACHAT SAVINGS</span>
+              <span class="savings-amount" id="summary-savings-amount">₹0.00</span>
+              <span class="savings-subtext">Customer Savings</span>
+            </div>
+          </div>
+
+          <!-- Billing Summary Calculation Card -->
+          <div class="pos-card summary-card">
+            <div class="pos-card-header">
+              <i data-lucide="calculator"></i>
+              <span>Billing Summary</span>
+              <span class="invoice-num-preview" id="preview-invoice-num">#SBB-0001</span>
+            </div>
+
+            <div class="summary-breakdown">
+              <div class="summary-row">
+                <span class="summary-label">Total MRP</span>
+                <span class="summary-val" id="summary-mrp-total">₹0.00</span>
+              </div>
+              <div class="summary-row text-success">
+                <span class="summary-label"><i data-lucide="tag" class="mini-icon"></i> Store Discount</span>
+                <span class="summary-val" id="summary-discount-total">-₹0.00</span>
+              </div>
+              
+              <!-- Additional Discount Row -->
+              <div class="summary-row extra-discount-row">
+                <div class="extra-discount-label">
+                  <span>Special Discount</span>
+                  <div class="discount-type-toggle">
+                    <button class="type-btn active" id="disc-type-rs">₹</button>
+                    <button class="type-btn" id="disc-type-pct">%</button>
+                  </div>
+                </div>
+                <div class="extra-discount-input-wrap">
+                  <input type="number" id="extra-discount-val" value="0" min="0" class="mini-number-input">
+                </div>
+              </div>
+
+              <!-- GST / Tax Toggle -->
+              <div class="summary-row gst-row">
+                <label class="gst-toggle-label" for="gst-enable-checkbox">
+                  <input type="checkbox" id="gst-enable-checkbox">
+                  <span>Include GST (5%)</span>
+                </label>
+                <span class="summary-val" id="summary-gst-total">₹0.00</span>
+              </div>
+
+              <div class="summary-divider"></div>
+
+              <div class="summary-row grand-total-row">
+                <div class="grand-total-label-group">
+                  <span class="grand-total-label">Grand Total</span>
+                  <span class="roundoff-note" id="roundoff-note">(Rounded)</span>
+                </div>
+                <div class="grand-total-amount" id="summary-grand-total">₹0.00</div>
+              </div>
+            </div>
+
+            <!-- Payment Method Selector -->
+            <div class="payment-method-section">
+              <label class="payment-label"><i data-lucide="wallet"></i> Select Payment Method:</label>
+              <div class="payment-methods-grid">
+                <button class="pay-method-btn active" data-method="Cash">
+                  <i data-lucide="banknote"></i>
+                  <span>Cash</span>
+                </button>
+                <button class="pay-method-btn" data-method="UPI">
+                  <i data-lucide="qr-code"></i>
+                  <span>UPI / QR</span>
+                </button>
+                <button class="pay-method-btn" data-method="Card">
+                  <i data-lucide="credit-card"></i>
+                  <span>Card</span>
+                </button>
+                <button class="pay-method-btn" data-method="Credit">
+                  <i data-lucide="book-open"></i>
+                  <span>Udhar / Khata</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- Cash Tendered & Change Return box -->
+            <div class="cash-calc-box" id="cash-calc-box">
+              <div class="cash-calc-row">
+                <div class="cash-calc-field">
+                  <label for="cash-received-input">Cash Tendered (₹):</label>
+                  <input type="number" id="cash-received-input" placeholder="0" class="cash-input">
+                </div>
+                <div class="cash-calc-field">
+                  <label>Change to Return (₹):</label>
+                  <div class="change-return-val" id="cash-change-display">₹0.00</div>
+                </div>
+              </div>
+              <div class="quick-cash-denoms">
+                <button class="denom-btn" data-amt="50">₹50</button>
+                <button class="denom-btn" data-amt="100">₹100</button>
+                <button class="denom-btn" data-amt="200">₹200</button>
+                <button class="denom-btn" data-amt="500">₹500</button>
+                <button class="denom-btn" data-amt="exact">Exact</button>
+              </div>
+            </div>
+
+            <!-- Bottom Right: Save Bill & Complete & Print Bill Actions -->
+            <div class="checkout-actions-row" style="margin-top: 20px;">
+              <button class="btn btn-primary btn-lg btn-block" id="quick-save-btn">
+                <i data-lucide="save"></i>
+                <span>Save Bill</span>
+              </button>
+              <button class="btn btn-success btn-lg btn-block" id="complete-checkout-btn">
+                <i data-lucide="check-circle-2"></i>
+                <span>Complete & Print Bill (F8)</span>
+              </button>
+              <button class="btn btn-outline btn-block" id="hold-cart-btn">
+                <i data-lucide="pause"></i> Hold Bill
+              </button>
+            </div>
+
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- TAB 2: INWARD STOCK & PRODUCT MANAGEMENT -->
+    <section id="view-inventory" class="view-section">
+      <div class="inventory-layout">
+        
+        <!-- Inward Stock Addition Card -->
+        <div class="inward-form-card">
+          <div class="card-header-with-badge">
+            <div class="header-text">
+              <h2 class="card-title">
+                <i data-lucide="package-plus"></i>
+                Inward Stock Entry (Add Products to Store)
+              </h2>
+              <p class="card-desc">Add newly purchased stock with barcode, inward date & time, quantities, MRP, and store selling rate.</p>
+            </div>
+            <span class="mode-pill" id="inward-form-mode">New Stock Inward</span>
+          </div>
+
+          <form id="inward-stock-form" class="inward-form">
+            <input type="hidden" id="inward-edit-id" value="">
+
+            <div class="form-grid-3">
+              <!-- Product Name -->
+              <div class="form-group span-2">
+                <label for="prod-name" class="required">Product Name & Variant</label>
+                <div class="input-with-icon">
+                  <i data-lucide="tag"></i>
+                  <input type="text" id="prod-name" class="form-input" placeholder="e.g. Fortune Sunflower Oil (1 Litre Pouch)" required>
+                </div>
+              </div>
+
+              <!-- Category -->
+              <div class="form-group">
+                <label for="prod-category" class="required">Category</label>
+                <select id="prod-category" class="form-select" required>
+                  <option value="Groceries & Staples">🌾 Groceries & Staples</option>
+                  <option value="Dairy & Bakery">🧈 Dairy & Bakery</option>
+                  <option value="Snacks & Beverages">🥤 Snacks & Beverages</option>
+                  <option value="Personal Care">🧼 Personal Care</option>
+                  <option value="Household & Cleaning">✨ Household & Cleaning</option>
+                  <option value="Spices & Masalas">🌶️ Spices & Masalas</option>
+                  <option value="Biscuits & Confectionery">🍪 Biscuits & Chocolates</option>
+                  <option value="General Store Items">📦 General Store Items</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="form-grid-3">
+              <!-- Barcode Field with Generate & Camera Scan Buttons -->
+              <div class="form-group span-2">
+                <label for="prod-barcode" class="required">Product Barcode (EAN-13 / Code-128)</label>
+                <div class="barcode-input-group">
+                  <div class="input-with-icon" style="flex: 1;">
+                    <i data-lucide="barcode"></i>
+                    <input type="text" id="prod-barcode" class="form-input" placeholder="Scan or enter barcode number..." required>
+                  </div>
+                  <button type="button" class="btn btn-secondary btn-sm" id="inward-scan-cam-btn" title="Scan Barcode via Camera">
+                    <i data-lucide="camera"></i> Scan
+                  </button>
+                  <button type="button" class="btn btn-outline btn-sm" id="inward-gen-barcode-btn" title="Generate New Barcode">
+                    <i data-lucide="refresh-cw"></i> Auto Barcode
+                  </button>
+                </div>
+              </div>
+
+              <!-- Date and Time of Inward Purchase -->
+              <div class="form-group">
+                <div class="label-with-action">
+                  <label for="prod-inward-datetime" class="required">Stock Purchase Date & Time</label>
+                  <button type="button" class="link-btn" id="set-now-datetime-btn">Set Now</button>
+                </div>
+                <div class="input-with-icon">
+                  <i data-lucide="calendar"></i>
+                  <input type="datetime-local" id="prod-inward-datetime" class="form-input" required>
+                </div>
+              </div>
+            </div>
+
+            <div class="form-grid-4">
+              <!-- Stock Quantity -->
+              <div class="form-group">
+                <label for="prod-quantity" class="required">Stock Quantity</label>
+                <div class="input-with-icon">
+                  <i data-lucide="layers"></i>
+                  <input type="number" id="prod-quantity" class="form-input" placeholder="e.g. 50" min="0" step="1" required>
+                </div>
+              </div>
+
+              <!-- Unit -->
+              <div class="form-group">
+                <label for="prod-unit" class="required">Unit</label>
+                <select id="prod-unit" class="form-select" required>
+                  <option value="Pcs">Pcs / Units</option>
+                  <option value="Packets">Packets</option>
+                  <option value="Kg">Kg</option>
+                  <option value="Grams">Grams</option>
+                  <option value="Litre">Litre</option>
+                  <option value="ML">ML</option>
+                  <option value="Box">Box / Carton</option>
+                </select>
+              </div>
+
+              <!-- MRP -->
+              <div class="form-group">
+                <label for="prod-mrp" class="required">MRP (₹)</label>
+                <div class="input-with-icon">
+                  <i data-lucide="indian-rupee"></i>
+                  <input type="number" id="prod-mrp" class="form-input" placeholder="0.00" min="0" step="0.5" required>
+                </div>
+              </div>
+
+              <!-- Selling Rate -->
+              <div class="form-group">
+                <label for="prod-rate" class="required">Our Bachat Rate (₹)</label>
+                <div class="input-with-icon">
+                  <i data-lucide="badge-percent"></i>
+                  <input type="number" id="prod-rate" class="form-input" placeholder="0.00" min="0" step="0.5" required>
+                </div>
+              </div>
+            </div>
+
+            <div class="form-grid-3">
+              <!-- Purchase Cost Price (Optional, for profit tracking) -->
+              <div class="form-group">
+                <label for="prod-cost-price">Purchase Cost Rate (₹) <span class="optional-tag">Optional</span></label>
+                <div class="input-with-icon">
+                  <i data-lucide="trending-down"></i>
+                  <input type="number" id="prod-cost-price" class="form-input" placeholder="Store cost price" min="0" step="0.5">
+                </div>
+              </div>
+
+              <!-- Shelf / Rack Location -->
+              <div class="form-group">
+                <label for="prod-shelf">Shelf / Rack Location <span class="optional-tag">Optional</span></label>
+                <div class="input-with-icon">
+                  <i data-lucide="map-pin"></i>
+                  <input type="text" id="prod-shelf" class="form-input" placeholder="e.g. Rack A-2">
+                </div>
+              </div>
+
+              <!-- Calculated Customer Savings preview -->
+              <div class="form-group">
+                <label>Customer Savings Preview</label>
+                <div class="margin-preview-box" id="inward-savings-preview">
+                  <span class="preview-badge text-success">Save: ₹0 (0%)</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Form Actions -->
+            <div class="form-actions-row">
+              <button type="submit" class="btn btn-success btn-md" id="save-product-btn">
+                <i data-lucide="plus-circle"></i>
+                <span id="save-btn-text">Save Inward Product Stock</span>
+              </button>
+              <button type="button" class="btn btn-secondary btn-md" id="reset-inward-form-btn">
+                <i data-lucide="rotate-ccw"></i>
+                <span>Reset Form</span>
+              </button>
+            </div>
+          </form>
+        </div>
+
+        <!-- Inventory List Table Card -->
+        <div class="inventory-table-card">
+          <div class="inventory-toolbar">
+            <div class="search-box-wrap">
+              <i data-lucide="search"></i>
+              <input type="text" id="inventory-search-input" class="inventory-search-input" placeholder="Search by product name, barcode, category...">
+            </div>
+
+            <div class="filter-group">
+              <select id="inventory-category-filter" class="form-select-sm">
+                <option value="all">All Categories</option>
+                <option value="Groceries & Staples">Groceries & Staples</option>
+                <option value="Dairy & Bakery">Dairy & Bakery</option>
+                <option value="Snacks & Beverages">Snacks & Beverages</option>
+                <option value="Personal Care">Personal Care</option>
+                <option value="Household & Cleaning">Household & Cleaning</option>
+                <option value="Spices & Masalas">Spices & Masalas</option>
+              </select>
+
+              <select id="inventory-stock-filter" class="form-select-sm">
+                <option value="all">All Stock Status</option>
+                <option value="low">Low Stock (< 10)</option>
+                <option value="out">Out of Stock (0)</option>
+                <option value="available">Available Stock</option>
+              </select>
+
+              <button class="btn btn-outline btn-sm" id="print-all-barcodes-btn">
+                <i data-lucide="printer"></i> Print Barcode Tags
+              </button>
+
+              <button class="btn btn-outline btn-sm" id="export-inventory-csv-btn">
+                <i data-lucide="download"></i> Export CSV
+              </button>
+            </div>
+          </div>
+
+          <div class="table-responsive">
+            <table class="data-table" id="inventory-table">
+              <thead>
+                <tr>
+                  <th>Barcode</th>
+                  <th>Product Name</th>
+                  <th>Category</th>
+                  <th>Inward Date & Time</th>
+                  <th>Stock Qty</th>
+                  <th>MRP (₹)</th>
+                  <th>Our Rate (₹)</th>
+                  <th>Savings</th>
+                  <th style="text-align: center;">Actions</th>
+                </tr>
+              </thead>
+              <tbody id="inventory-table-body">
+                <!-- Populated dynamically -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- TAB 3: BILL HISTORY & RE-PRINT -->
+    <section id="view-history" class="view-section">
+      <div class="history-layout">
+        
+        <div class="history-header-card">
+          <div class="history-title-group">
+            <h2 class="card-title">
+              <i data-lucide="receipt"></i>
+              Sales & Invoice History
+            </h2>
+            <p class="card-desc">All past created bills, customer details, print thermal receipts, or share bills on WhatsApp.</p>
+          </div>
+
+          <div class="history-search-row">
+            <div class="search-box-wrap" style="flex: 1;">
+              <i data-lucide="search"></i>
+              <input type="text" id="history-search-input" class="inventory-search-input" placeholder="Search by Bill No. (e.g. SBB-001), Customer Name, or Phone...">
+            </div>
+            <input type="date" id="history-date-filter" class="form-input-sm">
+            <select id="history-payment-filter" class="form-select-sm">
+              <option value="all">All Payment Methods</option>
+              <option value="Cash">Cash</option>
+              <option value="UPI">UPI / QR</option>
+              <option value="Card">Card</option>
+              <option value="Credit">Khata / Udhar</option>
+            </select>
+            <button class="btn btn-outline btn-sm" id="export-sales-csv-btn">
+              <i data-lucide="file-spreadsheet"></i> Export Sales
+            </button>
+          </div>
+        </div>
+
+        <div class="history-table-card">
+          <div class="table-responsive">
+            <table class="data-table" id="history-table">
+              <thead>
+                <tr>
+                  <th>Invoice No.</th>
+                  <th>Date & Time</th>
+                  <th>Customer Details</th>
+                  <th>Items Count</th>
+                  <th>Total MRP</th>
+                  <th>Bachat Savings</th>
+                  <th>Grand Total (₹)</th>
+                  <th>Payment Mode</th>
+                  <th style="text-align: center;">Actions</th>
+                </tr>
+              </thead>
+              <tbody id="history-table-body">
+                <!-- Populated dynamically -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- TAB 4: ANALYTICS & DASHBOARD -->
+    <section id="view-analytics" class="view-section">
+      <div class="analytics-layout">
+        
+        <!-- Summary Metric Cards -->
+        <div class="metrics-grid">
+          <div class="metric-card metric-primary">
+            <div class="metric-icon-wrap">
+              <i data-lucide="badge-indian-rupee"></i>
+            </div>
+            <div class="metric-info">
+              <span class="metric-title">Today's Total Sales</span>
+              <h3 class="metric-value" id="metric-today-sales">₹0.00</h3>
+              <span class="metric-sub" id="metric-today-bills-count">0 bills generated today</span>
+            </div>
+          </div>
+
+          <div class="metric-card metric-success">
+            <div class="metric-icon-wrap">
+              <i data-lucide="piggy-bank"></i>
+            </div>
+            <div class="metric-info">
+              <span class="metric-title">Customer Bachat Given</span>
+              <h3 class="metric-value" id="metric-today-savings">₹0.00</h3>
+              <span class="metric-sub">Total savings passed to shoppers</span>
+            </div>
+          </div>
+
+          <div class="metric-card metric-info">
+            <div class="metric-icon-wrap">
+              <i data-lucide="boxes"></i>
+            </div>
+            <div class="metric-info">
+              <span class="metric-title">Total Products in Store</span>
+              <h3 class="metric-value" id="metric-total-products">0</h3>
+              <span class="metric-sub" id="metric-low-stock-count">0 low stock alerts</span>
+            </div>
+          </div>
+
+          <div class="metric-card metric-warning">
+            <div class="metric-icon-wrap">
+              <i data-lucide="trending-up"></i>
+            </div>
+            <div class="metric-info">
+              <span class="metric-title">All-Time Revenue</span>
+              <h3 class="metric-value" id="metric-alltime-sales">₹0.00</h3>
+              <span class="metric-sub" id="metric-alltime-bills">0 all-time invoices</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Charts / Analytics Breakdown Cards -->
+        <div class="analytics-charts-grid">
+          
+          <div class="analytics-card">
+            <h3 class="analytics-card-title">
+              <i data-lucide="pie-chart"></i>
+              Payment Methods Breakdown
+            </h3>
+            <div class="payment-stats-list" id="payment-stats-container">
+              <!-- Populated dynamically -->
+            </div>
+          </div>
+
+          <div class="analytics-card">
+            <h3 class="analytics-card-title">
+              <i data-lucide="trophy"></i>
+              Top Selling Products
+            </h3>
+            <div class="top-products-list" id="top-products-container">
+              <!-- Populated dynamically -->
+            </div>
+          </div>
+
+        </div>
+
+      </div>
+    </section>
+
+    <!-- TAB 5: STORE SETTINGS & DATA BACKUP -->
+    <section id="view-settings" class="view-section">
+      <div class="settings-layout">
+        
+        <div class="settings-card">
+          <div class="pos-card-header">
+            <i data-lucide="store"></i>
+            <span>Store Profile & Receipt Branding</span>
+          </div>
+
+          <form id="store-settings-form" class="settings-form">
+            <div class="form-grid-2">
+              <div class="form-group">
+                <label for="set-store-name">Store Name</label>
+                <input type="text" id="set-store-name" class="form-input" value="SUPER BACHAT BAZZAR" required>
+              </div>
+              <div class="form-group">
+                <label for="set-store-address">Store Address (Small letters / subtitle)</label>
+                <input type="text" id="set-store-address" class="form-input" value="attardah kachhi pakki , muzzafarpur" required>
+              </div>
+            </div>
+
+            <div class="form-grid-2">
+              <div class="form-group">
+                <label for="set-store-phone">Store Phone / WhatsApp</label>
+                <input type="text" id="set-store-phone" class="form-input" value="+91 98765 43210">
+              </div>
+              <div class="form-group">
+                <label for="set-store-upi">UPI VPA for Instant QR Payments</label>
+                <input type="text" id="set-store-upi" class="form-input" value="superbachat@upi" placeholder="yourname@upi">
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label for="set-store-wishes">Bottom Customer Wishes / Greetings on Bill</label>
+              <textarea id="set-store-wishes" class="form-textarea" rows="2">🙏 Thank you for shopping with us! Visit again. Save More with Super Bachat Bazzar! 🙏</textarea>
+            </div>
+
+            <div class="form-actions-row">
+              <button type="submit" class="btn btn-primary">
+                <i data-lucide="check"></i> Save Store Settings
+              </button>
+            </div>
+          </form>
+        </div>
+
+        <div class="settings-card">
+          <div class="pos-card-header">
+            <i data-lucide="database"></i>
+            <span>Backup & Reset Store Data</span>
+          </div>
+          <div class="backup-actions-grid">
+            <div class="backup-item">
+              <h4>Export Backup File</h4>
+              <p>Download all inventory items and bill history as a JSON file for safe recordkeeping.</p>
+              <button class="btn btn-outline" id="download-backup-btn">
+                <i data-lucide="download"></i> Download Full Backup
+              </button>
+            </div>
+
+            <div class="backup-item">
+              <h4>Restore Data</h4>
+              <p>Load previous inventory & bills from a saved backup JSON file.</p>
+              <label class="btn btn-outline file-label">
+                <i data-lucide="upload"></i> Restore from JSON
+                <input type="file" id="restore-backup-input" accept=".json" style="display: none;">
+              </label>
+            </div>
+
+            <div class="backup-item">
+              <h4>Reset Sample Data</h4>
+              <p>Reload default sample supermarket grocery items for testing.</p>
+              <button class="btn btn-outline-danger" id="reset-sample-data-btn">
+                <i data-lucide="refresh-cw"></i> Load Sample Inventory
+              </button>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ================= MODALS ================= -->
+
+  <!-- MODAL 1: CAMERA BARCODE SCANNER MODAL -->
+  <div class="modal-backdrop" id="camera-modal">
+    <div class="modal-dialog modal-md">
+      <div class="modal-header">
+        <div class="modal-title">
+          <i data-lucide="camera"></i>
+          <span>Live Camera Barcode Scanner</span>
+        </div>
+        <button class="modal-close-btn" id="close-cam-modal-btn">
+          <i data-lucide="x"></i>
+        </button>
+      </div>
+      <div class="modal-body">
+        <div class="camera-stream-wrapper">
+          <div id="camera-scanner-reader"></div>
+          <div class="scanner-laser-line"></div>
+        </div>
+        <p class="camera-hint">Point your camera at any 1D/2D barcode or QR code on the product packet.</p>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" id="cancel-cam-btn">Close Scanner</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL 2: DYNAMIC UPI QR PAYMENT MODAL -->
+  <div class="modal-backdrop" id="upi-qr-modal">
+    <div class="modal-dialog modal-sm">
+      <div class="modal-header">
+        <div class="modal-title">
+          <i data-lucide="qr-code"></i>
+          <span>Scan UPI QR to Pay</span>
+        </div>
+        <button class="modal-close-btn" id="close-upi-modal-btn">
+          <i data-lucide="x"></i>
+        </button>
+      </div>
+      <div class="modal-body text-center">
+        <div class="upi-store-badge">SUPER BACHAT BAZZAR</div>
+        <div class="upi-amount-highlight" id="modal-upi-amount">₹0.00</div>
+        
+        <div class="qr-code-container" id="modal-qrcode-target">
+          <!-- QRCode.js renders here -->
+        </div>
+
+        <div class="upi-supported-apps">
+          <span>GPay</span> • <span>PhonePe</span> • <span>Paytm</span> • <span>BHIM UPI</span>
+        </div>
+        <p class="upi-help-text">Ask customer to scan using any UPI App & verify payment.</p>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-success btn-block" id="upi-confirm-paid-btn">
+          <i data-lucide="check-check"></i> Payment Received - Print Bill
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL 3: INVOICE / THERMAL RECEIPT PRINT MODAL -->
+  <div class="modal-backdrop" id="receipt-modal">
+    <div class="modal-dialog modal-lg">
+      <div class="modal-header">
+        <div class="modal-title">
+          <i data-lucide="printer"></i>
+          <span>Bill Generated Successfully</span>
+        </div>
+        <div class="receipt-header-actions">
+          <div class="receipt-format-toggle">
+            <button class="format-btn active" id="format-thermal-btn">Thermal Slip (80mm)</button>
+            <button class="format-btn" id="format-a4-btn">Standard A4/A5</button>
+          </div>
+          <button class="modal-close-btn" id="close-receipt-modal-btn">
+            <i data-lucide="x"></i>
+          </button>
+        </div>
+      </div>
+
+      <div class="modal-body receipt-modal-body">
+        
+        <!-- PRINTABLE INVOICE CONTENT (This is printed via window.print) -->
+        <div class="printable-receipt-wrapper" id="printable-receipt">
+          
+          <!-- Store Header -->
+          <div class="receipt-header">
+            <h1 class="receipt-store-name">SUPER BACHAT BAZZAR</h1>
+            <p class="receipt-store-address">attardah kachhi pakki , muzzafarpur</p>
+            <p class="receipt-store-contact" id="receipt-contact-line">Mob: +91 98765 43210</p>
+            <div class="receipt-type-pill">RETAIL TAX INVOICE / CASH MEMO</div>
+          </div>
+
+          <div class="receipt-meta-grid">
+            <div>
+              <span class="meta-lbl">Bill No:</span> <strong id="receipt-bill-no">SBB-0001</strong>
+            </div>
+            <div class="text-right">
+              <span class="meta-lbl">Date:</span> <span id="receipt-datetime">01-09-2026 02:00 PM</span>
+            </div>
+            <div>
+              <span class="meta-lbl">Customer:</span> <span id="receipt-customer-name">Cash Customer</span>
+            </div>
+            <div class="text-right">
+              <span class="meta-lbl">Phone:</span> <span id="receipt-customer-phone">-</span>
+            </div>
+          </div>
+
+          <div class="receipt-divider"></div>
+
+          <!-- Items Table -->
+          <table class="receipt-items-table">
+            <thead>
+              <tr>
+                <th style="width: 25px;">#</th>
+                <th>Item Description</th>
+                <th class="text-right" style="width: 50px;">Qty</th>
+                <th class="text-right" style="width: 60px;">MRP</th>
+                <th class="text-right" style="width: 65px;">Rate</th>
+                <th class="text-right" style="width: 75px;">Amount</th>
+              </tr>
+            </thead>
+            <tbody id="receipt-items-body">
+              <!-- Populated dynamically -->
+            </tbody>
+          </table>
+
+          <div class="receipt-divider"></div>
+
+          <!-- Calculation Totals -->
+          <div class="receipt-totals-table">
+            <div class="receipt-total-row">
+              <span>Total Items / Qty:</span>
+              <span id="receipt-total-items-qty">0 items / 0 pcs</span>
+            </div>
+            <div class="receipt-total-row">
+              <span>Total MRP Value:</span>
+              <span id="receipt-total-mrp">₹0.00</span>
+            </div>
+            <div class="receipt-total-row text-success font-bold">
+              <span>Super Bachat Store Discount:</span>
+              <span id="receipt-discount-saved">- ₹0.00</span>
+            </div>
+            <div class="receipt-total-row" id="receipt-extra-disc-row" style="display: none;">
+              <span>Special Extra Discount:</span>
+              <span id="receipt-extra-disc-val">- ₹0.00</span>
+            </div>
+            <div class="receipt-total-row" id="receipt-tax-row" style="display: none;">
+              <span>GST (5%):</span>
+              <span id="receipt-tax-val">₹0.00</span>
+            </div>
+
+            <div class="receipt-divider double"></div>
+
+            <div class="receipt-total-row grand-total">
+              <span>NET PAYABLE AMOUNT:</span>
+              <span id="receipt-grand-total">₹0.00</span>
+            </div>
+
+            <div class="receipt-total-row payment-info">
+              <span>Payment Mode: <strong id="receipt-payment-mode">Cash</strong></span>
+              <span id="receipt-payment-meta">Paid in Full</span>
+            </div>
+          </div>
+
+          <!-- Highlight Savings Banner on Bill -->
+          <div class="receipt-savings-box">
+            <span>🎉 YOU SAVED A TOTAL OF <strong id="receipt-saved-highlight">₹0.00</strong> ON THIS BILL! 🎉</span>
+          </div>
+
+          <!-- Store Footer Customer Wishes (REQUIRED) -->
+          <div class="receipt-footer">
+            <p class="wishes-line" id="receipt-wishes-text">🙏 Thank you for shopping with us! Visit again. Save More with Super Bachat Bazzar! 🙏</p>
+            <p class="footer-policy">Goods once sold can be exchanged within 3 days with this original bill.</p>
+            <p class="footer-blessing">✨ Super Bachat, Super Khushiyan! ✨</p>
+            
+            <!-- Printed Barcode for Return / Scan Verification -->
+            <div class="receipt-barcode-wrap">
+              <svg id="receipt-barcode-svg"></svg>
+            </div>
+          </div>
+
+        </div>
+
+      </div>
+
+      <div class="modal-footer receipt-actions">
+        <button class="btn btn-success btn-lg" id="print-bill-btn">
+          <i data-lucide="printer"></i>
+          <span>Print Receipt</span>
+        </button>
+        <button class="btn btn-whatsapp btn-lg" id="whatsapp-bill-btn">
+          <i data-lucide="send"></i>
+          <span>Share WhatsApp</span>
+        </button>
+        <button class="btn btn-secondary btn-lg" id="new-sale-btn">
+          <i data-lucide="plus-circle"></i>
+          <span>New Sale (F2)</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL 4: BARCODE LABEL PRINT MODAL (FOR STICKERS) -->
+  <div class="modal-backdrop" id="barcode-stickers-modal">
+    <div class="modal-dialog modal-lg">
+      <div class="modal-header">
+        <div class="modal-title">
+          <i data-lucide="tags"></i>
+          <span>Print Product Barcode Stickers / Price Tags</span>
+        </div>
+        <button class="modal-close-btn" id="close-stickers-modal-btn">
+          <i data-lucide="x"></i>
+        </button>
+      </div>
+      <div class="modal-body">
+        <div class="sticker-controls">
+          <span>Sticker Quantity per Item:</span>
+          <input type="number" id="sticker-copies-input" value="2" min="1" max="20" class="mini-number-input">
+          <button class="btn btn-primary btn-sm" id="print-stickers-btn">
+            <i data-lucide="printer"></i> Print Sticker Sheet
+          </button>
+        </div>
+        <div class="stickers-sheet" id="stickers-sheet-target">
+          <!-- Rendered barcode stickers -->
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL 5: EDIT BILL MODAL -->
+  <div class="modal-backdrop" id="edit-bill-modal">
+    <div class="modal-dialog modal-xl">
+      <div class="modal-header">
+        <div class="modal-title">
+          <i data-lucide="file-pen-line"></i>
+          <span>Edit Bill — <span id="edit-bill-invoice-num">SBB-0001</span></span>
+        </div>
+        <button class="modal-close-btn" id="close-edit-bill-modal-btn">
+          <i data-lucide="x"></i>
+        </button>
+      </div>
+
+      <div class="modal-body edit-bill-modal-body">
+
+        <!-- Top: Customer Info & Payment -->
+        <div class="edit-bill-top-grid">
+          <div class="edit-section-card">
+            <h4 class="edit-section-title"><i data-lucide="user"></i> Customer Details</h4>
+            <div class="form-grid-2" style="gap: 12px;">
+              <div class="form-group">
+                <label for="edit-cust-name">Customer Name</label>
+                <div class="input-with-icon">
+                  <i data-lucide="user"></i>
+                  <input type="text" id="edit-cust-name" class="form-input" placeholder="Cash Customer / Guest">
+                </div>
+              </div>
+              <div class="form-group">
+                <label for="edit-cust-phone">Mobile Number</label>
+                <div class="input-with-icon">
+                  <i data-lucide="phone"></i>
+                  <input type="tel" id="edit-cust-phone" class="form-input" placeholder="10-digit mobile">
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="edit-section-card">
+            <h4 class="edit-section-title"><i data-lucide="wallet"></i> Payment & Billing</h4>
+            <div class="form-grid-2" style="gap: 12px;">
+              <div class="form-group">
+                <label for="edit-payment-method">Payment Method</label>
+                <select id="edit-payment-method" class="form-select">
+                  <option value="Cash">Cash</option>
+                  <option value="UPI">UPI / QR</option>
+                  <option value="Card">Card</option>
+                  <option value="Credit">Udhar / Khata</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label for="edit-bill-date">Bill Date & Time</label>
+                <div class="input-with-icon">
+                  <i data-lucide="calendar"></i>
+                  <input type="datetime-local" id="edit-bill-date" class="form-input">
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Add Product to Bill -->
+        <div class="edit-section-card">
+          <h4 class="edit-section-title"><i data-lucide="plus-circle"></i> Add / Search Product to Bill</h4>
+          <div class="edit-add-product-row">
+            <div class="search-box-wrap" style="flex: 1; position: relative;">
+              <i data-lucide="search"></i>
+              <input type="text" id="edit-product-search" class="inventory-search-input" placeholder="Type product name or barcode to add to this bill...">
+              <div class="search-suggestions" id="edit-search-suggestions" style="display:none;"></div>
+            </div>
+            <span class="edit-or-divider">or enter manually:</span>
+            <input type="text" id="edit-manual-name" class="form-input" style="width:200px;" placeholder="Product name">
+            <input type="number" id="edit-manual-mrp" class="form-input" style="width:100px;" placeholder="MRP ₹">
+            <input type="number" id="edit-manual-rate" class="form-input" style="width:100px;" placeholder="Rate ₹">
+            <input type="number" id="edit-manual-qty" class="form-input" style="width:80px;" placeholder="Qty" min="1" value="1">
+            <button class="btn btn-primary btn-sm" id="edit-add-manual-item-btn">
+              <i data-lucide="plus"></i> Add Item
+            </button>
+          </div>
+        </div>
+
+        <!-- Items Table -->
+        <div class="edit-section-card edit-items-section">
+          <h4 class="edit-section-title">
+            <i data-lucide="list"></i> Bill Items
+            <span class="cart-badge" id="edit-items-count">0 items</span>
+          </h4>
+          <div class="table-responsive" style="max-height: 320px;">
+            <table class="cart-table" id="edit-items-table">
+              <thead>
+                <tr>
+                  <th style="width:36px;">#</th>
+                  <th>Product Name</th>
+                  <th style="width:110px;">MRP (₹)</th>
+                  <th style="width:110px;">Rate (₹)</th>
+                  <th style="width:130px; text-align:center;">Quantity</th>
+                  <th style="width:110px; text-align:right;">Total (₹)</th>
+                  <th style="width:90px; text-align:right;">Savings</th>
+                  <th style="width:46px; text-align:center;">Del</th>
+                </tr>
+              </thead>
+              <tbody id="edit-items-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Live Totals Summary -->
+        <div class="edit-totals-row">
+          <div class="edit-totals-card">
+            <div class="edit-total-line"><span>Total MRP</span><span id="edit-total-mrp" class="mono-val">₹0.00</span></div>
+            <div class="edit-total-line text-success"><span>Store Discount</span><span id="edit-total-discount" class="mono-val">-₹0.00</span></div>
+            <div class="edit-total-line">
+              <span>Extra Discount</span>
+              <div style="display:flex; align-items:center; gap:6px;">
+                <select id="edit-extra-disc-type" class="form-select-sm" style="width:58px;">
+                  <option value="rs">₹</option>
+                  <option value="pct">%</option>
+                </select>
+                <input type="number" id="edit-extra-disc-val" value="0" min="0" class="mini-number-input">
+              </div>
+            </div>
+            <div class="edit-total-line">
+              <label style="display:flex; align-items:center; gap:6px; font-size:13px;">
+                <input type="checkbox" id="edit-gst-enable"> GST (5%)
+              </label>
+              <span id="edit-gst-val" class="mono-val">₹0.00</span>
+            </div>
+            <div class="edit-total-divider"></div>
+            <div class="edit-total-line edit-grand-total-row">
+              <span>GRAND TOTAL</span>
+              <span id="edit-grand-total" class="edit-grand-total-val">₹0.00</span>
+            </div>
+            <div class="edit-savings-row">
+              <i data-lucide="sparkles"></i>
+              Customer saves: <strong id="edit-cust-savings">₹0.00</strong>
+            </div>
+          </div>
+        </div>
+
+      </div><!-- end modal-body -->
+
+      <div class="modal-footer" style="justify-content: space-between;">
+        <button class="btn btn-outline-danger" id="delete-bill-btn">
+          <i data-lucide="trash-2"></i> Delete Bill
+        </button>
+        <div style="display:flex; gap:10px;">
+          <button class="btn btn-secondary" id="cancel-edit-bill-btn">Cancel</button>
+          <button class="btn btn-success btn-lg" id="save-edit-bill-btn">
+            <i data-lucide="save"></i> Save Changes & Update Bill
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Load Main JavaScript Engine -->
+  <script src="app.js"></script>
+</body>
+</html>
