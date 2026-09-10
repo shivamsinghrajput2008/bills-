@@ -25,6 +25,72 @@
   <link rel="stylesheet" href="style.css">
 </head>
 <body class="theme-light">
+  <!-- POS High-Security Terminal Lock Screen -->
+  <div id="app-lock-overlay" class="lock-overlay" style="display: flex;">
+    <div class="lock-card" id="lock-card">
+      <div class="lock-icon-halo">
+        <div class="lock-pulse-ring"></div>
+        <div class="lock-shield-icon">
+          <i data-lucide="shield-check"></i>
+        </div>
+      </div>
+
+      <div class="lock-store-badge">
+        <img src="store-photo.jpg" alt="Super Bachat Bazzar Store Front" class="lock-store-img">
+        <div class="lock-store-meta">
+          <h2 class="lock-store-name">SUPER BACHAT BAZZAR</h2>
+          <span class="lock-store-sub"><i data-lucide="map-pin" class="mini-icon"></i> Attardah Kachhi Pakki, Muzaffarpur</span>
+        </div>
+      </div>
+
+      <div class="lock-header-text">
+        <h3 class="lock-title">Terminal Locked</h3>
+        <p class="lock-desc">Enter authorization password to access Billing, Inventory & Sales</p>
+      </div>
+
+      <form id="lock-screen-form" class="lock-form" autocomplete="off">
+        <div class="lock-input-group">
+          <i data-lucide="lock" class="lock-input-icon"></i>
+          <input 
+            type="password" 
+            id="lock-password-input" 
+            class="lock-input" 
+            placeholder="Enter password" 
+            autocomplete="current-password" 
+            required 
+            autofocus
+          >
+          <button type="button" id="lock-toggle-visibility" class="lock-toggle-pwd" title="Show / Hide Password" tabindex="-1">
+            <i data-lucide="eye" id="lock-eye-icon"></i>
+          </button>
+        </div>
+
+        <div id="lock-error-msg" class="lock-error-banner" style="display: none;">
+          <i data-lucide="alert-circle"></i>
+          <span id="lock-error-text">Incorrect password! Access denied.</span>
+        </div>
+
+        <div class="lock-remember-row">
+          <label class="lock-remember-label">
+            <input type="checkbox" id="lock-remember-check" checked>
+            <span>Remember on this computer</span>
+          </label>
+        </div>
+
+        <button type="submit" id="lock-submit-btn" class="lock-btn-submit">
+          <i data-lucide="key-round"></i>
+          <span>Unlock Terminal</span>
+        </button>
+      </form>
+
+      <div class="lock-security-footer">
+        <span class="lock-protected-pill">
+          <i data-lucide="shield" class="mini-icon"></i> POS Security Guard Active
+        </span>
+      </div>
+    </div>
+  </div>
+
   <!-- Audio Beep Generator & Sound Effects -->
   <div id="toast-container" class="toast-container" aria-live="polite"></div>
 
@@ -90,6 +156,9 @@
       </button>
       <button class="action-btn icon-btn" id="theme-toggle-btn" title="Toggle Dark/Light Mode">
         <i data-lucide="moon" id="theme-icon"></i>
+      </button>
+      <button class="action-btn icon-btn lock-btn-header" id="lock-terminal-btn" title="Lock POS Terminal">
+        <i data-lucide="lock" id="lock-icon"></i>
       </button>
     </div>
   </header>
@@ -735,6 +804,29 @@
               <button type="submit" class="btn btn-primary">
                 <i data-lucide="check"></i> Save Store Settings
               </button>
+            </div>
+          </form>
+        </div>
+
+        <div class="settings-card">
+          <div class="pos-card-header">
+            <i data-lucide="shield-alert"></i>
+            <span>Terminal Security & Access Password</span>
+          </div>
+          <form id="security-settings-form" class="settings-form">
+            <div class="form-grid-2">
+              <div class="form-group">
+                <label for="set-terminal-password">Terminal Access Password</label>
+                <input type="text" id="set-terminal-password" class="form-input" value="super99" required placeholder="Enter password">
+                <small style="color: var(--text-muted); font-size: 12px; display: block; margin-top: 6px;">
+                  Terminal requires this password to unlock.
+                </small>
+              </div>
+              <div class="form-group" style="display: flex; flex-direction: column; justify-content: flex-end;">
+                <button type="submit" class="btn btn-primary" style="align-self: flex-start;">
+                  <i data-lucide="save"></i> Update Password
+                </button>
+              </div>
             </div>
           </form>
         </div>

@@ -5,10 +5,10 @@
 
 :root {
   /* Brand Palette - Emerald & Modern Retail Theme */
-  --primary: #059669;
-  --primary-hover: #047857;
-  --primary-light: #d1fae5;
-  --primary-subtle: rgba(5, 150, 105, 0.08);
+  --primary: #f97316;
+  --primary-hover: #ea580c;
+  --primary-light: #ffedd5;
+  --primary-subtle: rgba(249, 115, 22, 0.08);
   
   --secondary: #475569;
   --secondary-hover: #334155;
@@ -40,14 +40,14 @@
 
   --border-color: #e2e8f0;
   --border-light: #f1f5f9;
-  --border-focus: #10b981;
+  --border-focus: #f97316;
 
   /* Shadows */
   --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
   --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.08), 0 2px 4px -2px rgba(0, 0, 0, 0.06);
   --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.08), 0 4px 6px -4px rgba(0, 0, 0, 0.04);
   --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.04);
-  --shadow-glow: 0 0 20px rgba(16, 185, 129, 0.25);
+  --shadow-glow: 0 0 20px rgba(249, 115, 22, 0.35);
 
   /* Radii */
   --radius-xs: 4px;
@@ -85,8 +85,8 @@ body.theme-dark {
   --shadow-md: 0 4px 8px -1px rgba(0, 0, 0, 0.5);
   --shadow-lg: 0 10px 20px -3px rgba(0, 0, 0, 0.6);
 
-  --primary-subtle: rgba(16, 185, 129, 0.15);
-  --savings-green-bg: rgba(16, 185, 129, 0.15);
+  --primary-subtle: rgba(251, 146, 60, 0.15);
+  --savings-green-bg: rgba(249, 115, 22, 0.15);
 }
 
 /* Base Styles */
@@ -140,7 +140,7 @@ html, body {
   object-fit: cover;
   border-radius: 8px;
   border: 2px solid var(--primary);
-  box-shadow: 0 4px 10px rgba(16, 185, 129, 0.25);
+  box-shadow: 0 4px 10px rgba(249, 115, 22, 0.25);
   transition: transform 0.2s ease;
 }
 
@@ -152,12 +152,12 @@ html, body {
   width: 44px;
   height: 44px;
   border-radius: var(--radius-md);
-  background: linear-gradient(135deg, #059669 0%, #10b981 100%);
+  background: linear-gradient(135deg, #f97316 0%, #ea580c 100%);
   color: white;
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 4px 10px rgba(16, 185, 129, 0.35);
+  box-shadow: 0 4px 10px rgba(249, 115, 22, 0.35);
 }
 
 .store-info-group {
@@ -176,14 +176,14 @@ html, body {
   font-size: 20px;
   font-weight: 800;
   letter-spacing: 0.5px;
-  background: linear-gradient(135deg, #065f46 0%, #059669 50%, #10b981 100%);
+  background: linear-gradient(135deg, #9a3412 0%, #ea580c 50%, #f97316 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   text-transform: uppercase;
 }
 
 body.theme-dark .store-title {
-  background: linear-gradient(135deg, #34d399 0%, #10b981 100%);
+  background: linear-gradient(135deg, #fb923c 0%, #ea580c 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
 }
@@ -194,7 +194,7 @@ body.theme-dark .store-title {
   gap: 6px;
   background: var(--savings-green-bg);
   color: var(--primary);
-  border: 1px solid rgba(16, 185, 129, 0.25);
+  border: 1px solid rgba(249, 115, 22, 0.25);
   font-size: 11px;
   font-weight: 700;
   padding: 2px 8px;
@@ -206,14 +206,14 @@ body.theme-dark .store-title {
   height: 7px;
   background: var(--savings-green);
   border-radius: 50%;
-  box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
+  box-shadow: 0 0 0 0 rgba(249, 115, 22, 0.7);
   animation: pulse-ring 1.8s infinite cubic-bezier(0.66, 0, 0, 1);
 }
 
 @keyframes pulse-ring {
-  0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }
-  70% { box-shadow: 0 0 0 7px rgba(16, 185, 129, 0); }
-  100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+  0% { box-shadow: 0 0 0 0 rgba(249, 115, 22, 0.7); }
+  70% { box-shadow: 0 0 0 7px rgba(249, 115, 22, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(249, 115, 22, 0); }
 }
 
 .store-subtitle {
@@ -350,7 +350,7 @@ body.theme-dark .store-title {
 
 /* Shortcut Banner */
 .shortcut-bar {
-  background: linear-gradient(90deg, #064e3b 0%, #065f46 50%, #047857 100%);
+  background: linear-gradient(90deg, #7c2d12 0%, #9a3412 50%, #ea580c 100%);
   color: white;
   padding: 6px 24px;
   display: flex;
@@ -365,7 +365,7 @@ body.theme-dark .store-title {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  color: #d1fae5;
+  color: #ffedd5;
   font-weight: 500;
 }
 
@@ -452,7 +452,7 @@ body.theme-dark .store-title {
 .scanner-input-wrapper:focus-within {
   border-color: var(--primary);
   background: var(--bg-surface);
-  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.15);
+  box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.15);
 }
 
 .scanner-icon {
@@ -572,7 +572,7 @@ body.theme-dark .store-title {
   background: var(--primary);
   color: white;
   border-color: var(--primary);
-  box-shadow: 0 2px 6px rgba(5, 150, 105, 0.3);
+  box-shadow: 0 2px 6px rgba(249, 115, 22, 0.3);
 }
 
 /* Quick Items Selection Grid */
@@ -950,14 +950,14 @@ body.theme-dark .store-title {
 
 /* Savings Banner */
 .savings-banner {
-  background: linear-gradient(135deg, #059669 0%, #10b981 100%);
+  background: linear-gradient(135deg, #f97316 0%, #ea580c 100%);
   color: white;
   border-radius: var(--radius-lg);
   padding: 14px 16px;
   display: flex;
   align-items: center;
   gap: 14px;
-  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+  box-shadow: 0 4px 12px rgba(249, 115, 22, 0.3);
 }
 
 .savings-badge-icon {
@@ -1396,7 +1396,7 @@ body.theme-dark .store-title {
 
 .form-input:focus, .form-select:focus, .form-textarea:focus {
   border-color: var(--primary);
-  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.15);
+  box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.15);
 }
 
 .barcode-input-group {
@@ -1882,13 +1882,13 @@ body.theme-dark .store-title {
 }
 
 .btn-success {
-  background: linear-gradient(135deg, #059669 0%, #10b981 100%);
+  background: linear-gradient(135deg, #f97316 0%, #ea580c 100%);
   color: white;
-  box-shadow: 0 4px 10px rgba(16, 185, 129, 0.3);
+  box-shadow: 0 4px 10px rgba(249, 115, 22, 0.3);
 }
 .btn-success:hover {
-  background: linear-gradient(135deg, #047857 0%, #059669 100%);
-  box-shadow: 0 6px 14px rgba(16, 185, 129, 0.4);
+  background: linear-gradient(135deg, #ea580c 0%, #c2410c 100%);
+  box-shadow: 0 6px 14px rgba(249, 115, 22, 0.4);
 }
 
 .btn-secondary {
@@ -2313,7 +2313,7 @@ body.theme-dark .receipt-modal-body {
 
 .receipt-savings-box {
   background: #ecfdf5;
-  border: 1px dashed #059669;
+  border: 1px dashed #f97316;
   border-radius: var(--radius-xs);
   padding: 6px 8px;
   text-align: center;
@@ -2527,3 +2527,384 @@ body.theme-dark .receipt-modal-body {
     size: auto;
   }
 }
+
+/* ================= POS TERMINAL SECURITY LOCK SCREEN ================= */
+body.terminal-locked {
+  overflow: hidden !important;
+}
+
+body.terminal-locked .app-header,
+body.terminal-locked .shortcut-bar,
+body.terminal-locked .main-container {
+  filter: blur(10px) brightness(0.65);
+  pointer-events: none !important;
+  user-select: none !important;
+  transition: filter 0.3s ease;
+}
+
+.lock-overlay {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: 999999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: radial-gradient(circle at 50% 30%, rgba(249, 115, 22, 0.2), transparent 70%), rgba(10, 15, 29, 0.92);
+  backdrop-filter: blur(28px) saturate(180%);
+  -webkit-backdrop-filter: blur(28px) saturate(180%);
+  transition: opacity 0.35s cubic-bezier(0.4, 0, 0.2, 1), transform 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.lock-overlay.lock-exiting {
+  opacity: 0;
+  transform: scale(1.04);
+  pointer-events: none;
+}
+
+.lock-card {
+  position: relative;
+  width: 100%;
+  max-width: 440px;
+  background: linear-gradient(165deg, rgba(30, 41, 67, 0.95) 0%, rgba(15, 23, 42, 0.98) 100%);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 20px;
+  padding: 34px 28px 28px;
+  box-shadow: 0 25px 60px -10px rgba(0, 0, 0, 0.8), 0 0 50px rgba(249, 115, 22, 0.2);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  color: #f8fafc;
+  animation: lockCardEntrance 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes lockCardEntrance {
+  0% {
+    opacity: 0;
+    transform: translateY(20px) scale(0.96);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.lock-card.shake {
+  animation: authShake 0.45s cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
+}
+
+@keyframes authShake {
+  10%, 90% { transform: translate3d(-3px, 0, 0); }
+  20%, 80% { transform: translate3d(6px, 0, 0); }
+  30%, 50%, 70% { transform: translate3d(-6px, 0, 0); }
+  40%, 60% { transform: translate3d(6px, 0, 0); }
+}
+
+/* Glowing halo & shield */
+.lock-icon-halo {
+  position: relative;
+  width: 72px;
+  height: 72px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 18px;
+}
+
+.lock-pulse-ring {
+  position: absolute;
+  inset: -6px;
+  border-radius: 50%;
+  border: 2px solid rgba(249, 115, 22, 0.5);
+  animation: lockPulseAnim 2.5s infinite;
+}
+
+@keyframes lockPulseAnim {
+  0% {
+    transform: scale(0.9);
+    opacity: 0.8;
+  }
+  50% {
+    transform: scale(1.15);
+    opacity: 0.2;
+  }
+  100% {
+    transform: scale(0.9);
+    opacity: 0.8;
+  }
+}
+
+.lock-shield-icon {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #f97316, #ea580c);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #ffffff;
+  box-shadow: 0 0 25px rgba(249, 115, 22, 0.4);
+}
+
+.lock-shield-icon svg {
+  width: 32px;
+  height: 32px;
+}
+
+/* Store Badge */
+.lock-store-badge {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 16px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 30px;
+  margin-bottom: 18px;
+}
+
+.lock-store-img {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid #f97316;
+}
+
+.lock-store-meta {
+  text-align: left;
+}
+
+.lock-store-name {
+  font-family: var(--font-brand);
+  font-size: 13.5px;
+  font-weight: 800;
+  letter-spacing: 0.8px;
+  color: #ffffff;
+  margin: 0;
+  line-height: 1.2;
+}
+
+.lock-store-sub {
+  font-size: 10.5px;
+  color: #94a3b8;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* Header Text */
+.lock-header-text {
+  margin-bottom: 22px;
+}
+
+.lock-title {
+  font-family: var(--font-brand);
+  font-size: 22px;
+  font-weight: 700;
+  color: #ffffff;
+  margin: 0 0 6px 0;
+  letter-spacing: -0.3px;
+}
+
+.lock-desc {
+  font-size: 13px;
+  color: #94a3b8;
+  margin: 0;
+  line-height: 1.4;
+}
+
+/* Lock Form */
+.lock-form {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.lock-input-group {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+}
+
+.lock-input-icon {
+  position: absolute;
+  left: 14px;
+  width: 18px;
+  height: 18px;
+  color: #94a3b8;
+  pointer-events: none;
+  transition: color 0.2s ease;
+}
+
+.lock-input {
+  width: 100%;
+  padding: 13px 44px 13px 42px;
+  background: rgba(15, 23, 42, 0.8);
+  border: 1.5px solid rgba(255, 255, 255, 0.15);
+  border-radius: 12px;
+  color: #ffffff;
+  font-family: var(--font-ui);
+  font-size: 14.5px;
+  letter-spacing: 0.5px;
+  outline: none;
+  transition: all 0.2s ease;
+}
+
+.lock-input::placeholder {
+  color: #64748b;
+  font-size: 13.5px;
+}
+
+.lock-input:focus {
+  border-color: #f97316;
+  background: rgba(15, 23, 42, 0.95);
+  box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.25);
+}
+
+.lock-input:focus ~ .lock-input-icon {
+  color: #f97316;
+}
+
+.lock-toggle-pwd {
+  position: absolute;
+  right: 12px;
+  background: none;
+  border: none;
+  color: #94a3b8;
+  cursor: pointer;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  transition: color 0.2s ease;
+}
+
+.lock-toggle-pwd:hover {
+  color: #ffffff;
+}
+
+.lock-toggle-pwd svg {
+  width: 18px;
+  height: 18px;
+}
+
+/* Error Banner */
+.lock-error-banner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: rgba(239, 68, 68, 0.15);
+  border: 1px solid rgba(239, 68, 68, 0.35);
+  color: #fca5a5;
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-size: 12.5px;
+  font-weight: 500;
+}
+
+.lock-error-banner svg {
+  width: 16px;
+  height: 16px;
+  color: #ef4444;
+  flex-shrink: 0;
+}
+
+/* Remember label */
+.lock-remember-row {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  padding: 0 4px;
+}
+
+.lock-remember-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12.5px;
+  color: #94a3b8;
+  cursor: pointer;
+  user-select: none;
+}
+
+.lock-remember-label input[type="checkbox"] {
+  accent-color: #f97316;
+  width: 15px;
+  height: 15px;
+  cursor: pointer;
+}
+
+/* Unlock Submit Button */
+.lock-btn-submit {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  padding: 13px 20px;
+  background: linear-gradient(135deg, #f97316 0%, #ea580c 100%);
+  color: #ffffff;
+  border: none;
+  border-radius: 12px;
+  font-family: var(--font-brand);
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  cursor: pointer;
+  box-shadow: 0 4px 14px rgba(249, 115, 22, 0.35);
+  transition: all 0.2s ease;
+}
+
+.lock-btn-submit:hover {
+  background: linear-gradient(135deg, #ea580c 0%, #c2410c 100%);
+  box-shadow: 0 6px 20px rgba(249, 115, 22, 0.5);
+  transform: translateY(-1px);
+}
+
+.lock-btn-submit:active {
+  transform: translateY(0);
+}
+
+.lock-btn-submit svg {
+  width: 18px;
+  height: 18px;
+}
+
+/* Footer security pill */
+.lock-security-footer {
+  margin-top: 20px;
+}
+
+.lock-protected-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 20px;
+  font-size: 11px;
+  color: #64748b;
+  font-weight: 500;
+}
+
+.lock-protected-pill svg {
+  width: 13px;
+  height: 13px;
+  color: #f97316;
+}
+
+/* Header lock button */
+.lock-btn-header:hover {
+  color: #ef4444 !important;
+  background: rgba(239, 68, 68, 0.12) !important;
+  border-color: rgba(239, 68, 68, 0.3) !important;
+}
+

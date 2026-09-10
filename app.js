@@ -10,7 +10,10 @@ const STORAGE_KEYS = {
   SETTINGS: 'sbb_settings_v1',
   THEME: 'sbb_theme_v1',
   SOUND: 'sbb_sound_v1',
-  NEXT_INVOICE_NUM: 'sbb_invoice_seq_v1'
+  NEXT_INVOICE_NUM: 'sbb_invoice_seq_v1',
+  AUTH_UNLOCKED: 'sbb_auth_unlocked_v1',
+  AUTH_SESSION: 'sbb_auth_session_v1',
+  APP_PASSWORD: 'sbb_app_password_v1'
 };
 
 const DEFAULT_SETTINGS = {
@@ -437,6 +440,7 @@ function formatDateTime(isoString) {
 // ================= INITIALIZATION =================
 document.addEventListener('DOMContentLoaded', () => {
   setupTheme();
+  setupLockScreen();
   setupNavigation();
   setupClock();
   setupPOS();
@@ -449,6 +453,118 @@ document.addEventListener('DOMContentLoaded', () => {
 
   if (window.lucide) window.lucide.createIcons();
 });
+
+// ================= TERMINAL SECURITY & PASSWORD ENGINE =================
+function getAppPassword() {
+  return localStorage.getItem(STORAGE_KEYS.APP_PASSWORD) || 'super99';
+}
+
+function isTerminalUnlocked() {
+  const localAuth = localStorage.getItem(STORAGE_KEYS.AUTH_UNLOCKED) === 'true';
+  const sessionAuth = sessionStorage.getItem(STORAGE_KEYS.AUTH_SESSION) === 'true';
+  return localAuth || sessionAuth;
+}
+
+function lockTerminal() {
+  localStorage.removeItem(STORAGE_KEYS.AUTH_UNLOCKED);
+  sessionStorage.removeItem(STORAGE_KEYS.AUTH_SESSION);
+  const overlay = document.getElementById('app-lock-overlay');
+  const input = document.getElementById('lock-password-input');
+  const err = document.getElementById('lock-error-msg');
+  if (err) err.style.display = 'none';
+  if (input) input.value = '';
+  if (overlay) {
+    overlay.style.display = 'flex';
+    overlay.classList.remove('lock-exiting');
+  }
+  document.body.classList.add('terminal-locked');
+  setTimeout(() => input?.focus(), 150);
+  showToast('POS Terminal locked.', 'info');
+}
+
+function setupLockScreen() {
+  const overlay = document.getElementById('app-lock-overlay');
+  const form = document.getElementById('lock-screen-form');
+  const pwdInput = document.getElementById('lock-password-input');
+  const toggleBtn = document.getElementById('lock-toggle-visibility');
+  const eyeIcon = document.getElementById('lock-eye-icon');
+  const rememberCheck = document.getElementById('lock-remember-check');
+  const errorMsg = document.getElementById('lock-error-msg');
+  const card = document.getElementById('lock-card');
+  const headerLockBtn = document.getElementById('lock-terminal-btn');
+
+  if (headerLockBtn) {
+    headerLockBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      lockTerminal();
+    });
+  }
+
+  // Check existing authentication
+  if (isTerminalUnlocked()) {
+    if (overlay) overlay.style.display = 'none';
+    document.body.classList.remove('terminal-locked');
+  } else {
+    if (overlay) overlay.style.display = 'flex';
+    document.body.classList.add('terminal-locked');
+    setTimeout(() => pwdInput?.focus(), 150);
+  }
+
+  // Toggle eye visibility
+  if (toggleBtn && pwdInput && eyeIcon) {
+    toggleBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      const currentType = pwdInput.getAttribute('type');
+      const isPwd = currentType === 'password';
+      pwdInput.setAttribute('type', isPwd ? 'text' : 'password');
+      eyeIcon.setAttribute('data-lucide', isPwd ? 'eye-off' : 'eye');
+      if (window.lucide) window.lucide.createIcons();
+    });
+  }
+
+  // Handle unlock submit
+  if (form && pwdInput) {
+    form.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const entered = pwdInput.value.trim();
+      const actual = getAppPassword();
+
+      if (entered === actual) {
+        if (errorMsg) errorMsg.style.display = 'none';
+        if (rememberCheck && rememberCheck.checked) {
+          localStorage.setItem(STORAGE_KEYS.AUTH_UNLOCKED, 'true');
+        } else {
+          sessionStorage.setItem(STORAGE_KEYS.AUTH_SESSION, 'true');
+        }
+
+        playSound('success');
+
+        if (overlay) {
+          overlay.classList.add('lock-exiting');
+          setTimeout(() => {
+            overlay.style.display = 'none';
+            overlay.classList.remove('lock-exiting');
+            document.body.classList.remove('terminal-locked');
+            document.getElementById('barcode-input')?.focus();
+          }, 320);
+        } else {
+          document.body.classList.remove('terminal-locked');
+        }
+
+        showToast('Access Granted! Welcome to Super Bachat Bazzar POS', 'success');
+      } else {
+        playSound('error');
+        if (errorMsg) errorMsg.style.display = 'flex';
+        if (card) {
+          card.classList.remove('shake');
+          void card.offsetWidth; // trigger DOM reflow for CSS animation
+          card.classList.add('shake');
+        }
+        pwdInput.select();
+      }
+    });
+  }
+}
 
 // Theme & Sound Setup
 function setupTheme() {
@@ -1826,20 +1942,44 @@ function openEditBillModal(billId) {
   // Deep clone bill so changes can be cancelled
   editingBillState = JSON.parse(JSON.stringify(bill));
 
+  // Normalize items to ensure all fields are reliably accessible
+  editingBillState.items = (editingBillState.items || []).map(item => {
+    const mrp = Number(item.mrp) || 0;
+    const rate = Number(item.rate !== undefined ? item.rate : (item.ourRate !== undefined ? item.ourRate : mrp)) || 0;
+    const qty = Number(item.quantity) || 1;
+    return {
+      productId: item.productId || (item.product && item.product.id) || '',
+      name: item.name || (item.product && item.product.name) || 'Item',
+      barcode: item.barcode || (item.product && item.product.barcode) || '',
+      unit: item.unit || (item.product && item.product.unit) || 'Pcs',
+      mrp: mrp,
+      rate: rate,
+      quantity: qty,
+      total: rate * qty,
+      savings: (mrp - rate) * qty
+    };
+  });
+
   const modal = document.getElementById('edit-bill-modal');
   if (!modal) return;
 
-  document.getElementById('edit-bill-invoice-num').textContent = editingBillState.invoiceNumber;
-  document.getElementById('edit-cust-name').value = editingBillState.customerName || '';
-  document.getElementById('edit-cust-phone').value = editingBillState.customerPhone || '';
-  document.getElementById('edit-payment-method').value = editingBillState.paymentMethod || 'Cash';
+  const invoiceEl = document.getElementById('edit-bill-invoice-num');
+  const custNameEl = document.getElementById('edit-cust-name');
+  const custPhoneEl = document.getElementById('edit-cust-phone');
+  const payMethodEl = document.getElementById('edit-payment-method');
+  const dateEl = document.getElementById('edit-bill-date');
+
+  if (invoiceEl) invoiceEl.textContent = editingBillState.invoiceNumber;
+  if (custNameEl) custNameEl.value = editingBillState.customerName || '';
+  if (custPhoneEl) custPhoneEl.value = editingBillState.customerPhone || '';
+  if (payMethodEl) payMethodEl.value = editingBillState.paymentMethod || 'Cash';
   
-  if (editingBillState.createdAt) {
+  if (editingBillState.createdAt && dateEl) {
     const d = new Date(editingBillState.createdAt);
     if (!isNaN(d.getTime())) {
       const pad = (n) => String(n).padStart(2, '0');
       const isoStr = `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
-      document.getElementById('edit-bill-date').value = isoStr;
+      dateEl.value = isoStr;
     }
   }
 
@@ -1847,7 +1987,7 @@ function openEditBillModal(billId) {
   const discValInput = document.getElementById('edit-extra-disc-val');
   if (discTypeSelect && discValInput) {
     discTypeSelect.value = editingBillState.extraDiscountType || 'rs';
-    discValInput.value = editingBillState.extraDiscountValue || 0;
+    discValInput.value = editingBillState.extraDiscountValue || editingBillState.extraDiscount || 0;
   }
 
   const gstCheckbox = document.getElementById('edit-gst-enable');
@@ -1881,22 +2021,22 @@ function renderEditBillItems() {
   }
 
   tbody.innerHTML = editingBillState.items.map((item, index) => {
-    const total = item.ourRate * item.quantity;
-    const savings = (item.mrp - item.ourRate) * item.quantity;
+    const total = item.rate * item.quantity;
+    const savings = (item.mrp - item.rate) * item.quantity;
     return `
       <tr>
         <td>${index + 1}</td>
         <td>
-          <div style="font-weight:600; color:var(--text-main);">${escapeHtml(item.product.name)}</div>
-          ${item.product.barcode ? `<div style="font-size:11px; color:var(--text-muted);">${item.product.barcode}</div>` : ''}
+          <div style="font-weight:600; color:var(--text-main);">${escapeHtml(item.name)}</div>
+          ${item.barcode ? `<div style="font-size:11px; color:var(--text-muted);">${escapeHtml(item.barcode)}</div>` : ''}
         </td>
         <td>
           <input type="number" class="mini-number-input" value="${item.mrp}" min="0" step="0.5" 
             onchange="updateEditItemPrice(${index}, 'mrp', this.value)">
         </td>
         <td>
-          <input type="number" class="mini-number-input" value="${item.ourRate}" min="0" step="0.5" 
-            onchange="updateEditItemPrice(${index}, 'ourRate', this.value)">
+          <input type="number" class="mini-number-input" value="${item.rate}" min="0" step="0.5" 
+            onchange="updateEditItemPrice(${index}, 'rate', this.value)">
         </td>
         <td style="text-align:center;">
           <div class="qty-btn-group" style="justify-content:center;">
@@ -1907,7 +2047,7 @@ function renderEditBillItems() {
           </div>
         </td>
         <td style="text-align:right; font-family:var(--font-mono); font-weight:700;">₹${total.toFixed(2)}</td>
-        <td style="text-align:right; color:var(--success); font-size:12px;">₹${savings.toFixed(2)}</td>
+        <td style="text-align:right; color:var(--savings-green, #10b981); font-size:12px; font-weight:600;">₹${savings.toFixed(2)}</td>
         <td style="text-align:center;">
           <button class="btn-remove-item" onclick="removeEditItem(${index})" title="Remove item">
             <i data-lucide="trash-2"></i>
@@ -1925,6 +2065,8 @@ function updateEditItemPrice(index, field, val) {
   if (!editingBillState || !editingBillState.items[index]) return;
   const num = parseFloat(val) || 0;
   editingBillState.items[index][field] = num;
+  editingBillState.items[index].total = editingBillState.items[index].rate * editingBillState.items[index].quantity;
+  editingBillState.items[index].savings = (editingBillState.items[index].mrp - editingBillState.items[index].rate) * editingBillState.items[index].quantity;
   renderEditBillItems();
 }
 
@@ -1935,6 +2077,8 @@ function changeEditItemQty(index, delta, directVal) {
   } else {
     editingBillState.items[index].quantity = Math.max(1, editingBillState.items[index].quantity + delta);
   }
+  editingBillState.items[index].total = editingBillState.items[index].rate * editingBillState.items[index].quantity;
+  editingBillState.items[index].savings = (editingBillState.items[index].mrp - editingBillState.items[index].rate) * editingBillState.items[index].quantity;
   renderEditBillItems();
 }
 
@@ -1948,8 +2092,8 @@ function calculateEditBillTotals() {
   if (!editingBillState) return;
 
   const totalMrp = editingBillState.items.reduce((s, i) => s + (i.mrp * i.quantity), 0);
-  const totalOurRate = editingBillState.items.reduce((s, i) => s + (i.ourRate * i.quantity), 0);
-  const storeDiscount = totalMrp - totalOurRate;
+  const totalStoreAmount = editingBillState.items.reduce((s, i) => s + (i.rate * i.quantity), 0);
+  const storeDiscount = totalMrp - totalStoreAmount;
 
   const discType = document.getElementById('edit-extra-disc-type')?.value || 'rs';
   const discVal = parseFloat(document.getElementById('edit-extra-disc-val')?.value) || 0;
@@ -1958,26 +2102,27 @@ function calculateEditBillTotals() {
   if (discType === 'rs') {
     extraDiscountAmount = discVal;
   } else {
-    extraDiscountAmount = (totalOurRate * discVal) / 100;
+    extraDiscountAmount = (totalStoreAmount * discVal) / 100;
   }
 
-  const afterDiscount = Math.max(0, totalOurRate - extraDiscountAmount);
+  const afterDiscount = Math.max(0, totalStoreAmount - extraDiscountAmount);
   
   const isGst = document.getElementById('edit-gst-enable')?.checked || false;
   const gstAmount = isGst ? (afterDiscount * 0.05) : 0;
   const grandTotal = Math.round(afterDiscount + gstAmount);
-  const totalCustomerSavings = (totalMrp - grandTotal);
+  const totalCustomerSavings = totalMrp - grandTotal;
 
   editingBillState.totalMrp = totalMrp;
-  editingBillState.totalOurRate = totalOurRate;
+  editingBillState.totalOurRate = totalStoreAmount;
   editingBillState.storeDiscount = storeDiscount;
+  editingBillState.extraDiscount = extraDiscountAmount;
   editingBillState.extraDiscountType = discType;
   editingBillState.extraDiscountValue = discVal;
   editingBillState.extraDiscountAmount = extraDiscountAmount;
   editingBillState.isGstEnabled = isGst;
   editingBillState.gstAmount = gstAmount;
   editingBillState.grandTotal = grandTotal;
-  editingBillState.totalCustomerSavings = totalCustomerSavings;
+  editingBillState.totalCustomerSavings = Math.max(0, totalCustomerSavings);
 
   const elMrp = document.getElementById('edit-total-mrp');
   const elDisc = document.getElementById('edit-total-discount');
@@ -1986,7 +2131,7 @@ function calculateEditBillTotals() {
   const elSavings = document.getElementById('edit-cust-savings');
 
   if (elMrp) elMrp.textContent = formatCurrency(totalMrp);
-  if (elDisc) elDisc.textContent = `-₹${storeDiscount.toFixed(2)}`;
+  if (elDisc) elDisc.textContent = `-₹${Math.max(0, storeDiscount).toFixed(2)}`;
   if (elGst) elGst.textContent = formatCurrency(gstAmount);
   if (elGrand) elGrand.textContent = formatCurrency(grandTotal);
   if (elSavings) elSavings.textContent = formatCurrency(Math.max(0, totalCustomerSavings));
@@ -2030,8 +2175,8 @@ function setupEditModalListenersOnce() {
 
     suggestionsBox.innerHTML = matches.map(p => `
       <div class="suggestion-item" onclick="addSearchProductToEditBill('${p.id}')">
-        <div><strong>${escapeHtml(p.name)}</strong> <span style="font-size:11px; color:var(--text-muted);">Stock: ${p.stockQty} ${p.unit}</span></div>
-        <div style="font-family:var(--font-mono); font-weight:700;">₹${p.ourRate} <span style="text-decoration:line-through; font-size:11px; color:var(--text-muted);">₹${p.mrp}</span></div>
+        <div><strong>${escapeHtml(p.name)}</strong> <span style="font-size:11px; color:var(--text-muted);">Stock: ${p.quantity} ${p.unit || 'Pcs'}</span></div>
+        <div style="font-family:var(--font-mono); font-weight:700; color:var(--primary);">₹${p.rate} <span style="text-decoration:line-through; font-size:11px; color:var(--text-muted);">₹${p.mrp}</span></div>
       </div>
     `).join('');
     suggestionsBox.style.display = 'block';
@@ -2054,16 +2199,21 @@ function setupEditModalListenersOnce() {
     }
 
     editingBillState.items.push({
-      product: { id: 'manual-' + Date.now(), name: name, barcode: '', category: 'General' },
+      productId: 'manual-' + Date.now(),
+      name: name,
+      barcode: '',
+      unit: 'Pcs',
       mrp: mrp,
-      ourRate: rate,
-      quantity: qty
+      rate: rate,
+      quantity: qty,
+      total: rate * qty,
+      savings: (mrp - rate) * qty
     });
 
-    nameInput.value = '';
-    mrpInput.value = '';
-    rateInput.value = '';
-    qtyInput.value = '1';
+    if (nameInput) nameInput.value = '';
+    if (mrpInput) mrpInput.value = '';
+    if (rateInput) rateInput.value = '';
+    if (qtyInput) qtyInput.value = '1';
 
     renderEditBillItems();
     showToast(`Added ${name} to bill`, 'success');
@@ -2074,15 +2224,22 @@ function addSearchProductToEditBill(productId) {
   const prod = state.products.find(p => p.id === productId);
   if (!prod || !editingBillState) return;
 
-  const existing = editingBillState.items.find(i => i.product.id === productId);
+  const existing = editingBillState.items.find(i => i.productId === productId);
   if (existing) {
     existing.quantity += 1;
+    existing.total = existing.rate * existing.quantity;
+    existing.savings = (existing.mrp - existing.rate) * existing.quantity;
   } else {
     editingBillState.items.push({
-      product: { ...prod },
+      productId: prod.id,
+      name: prod.name,
+      barcode: prod.barcode || '',
+      unit: prod.unit || 'Pcs',
       mrp: prod.mrp,
-      ourRate: prod.ourRate,
-      quantity: 1
+      rate: prod.rate,
+      quantity: 1,
+      total: prod.rate,
+      savings: prod.mrp - prod.rate
     });
   }
 
@@ -2113,17 +2270,23 @@ function saveEditedBill() {
 
   // Restore inventory stock from original bill items
   originalBill.items.forEach(oldItem => {
-    const prod = state.products.find(p => p.id === oldItem.product.id);
-    if (prod) {
-      prod.stockQty += oldItem.quantity;
+    const pId = oldItem.productId || (oldItem.product && oldItem.product.id);
+    if (pId) {
+      const prod = state.products.find(p => p.id === pId);
+      if (prod) {
+        prod.quantity = (prod.quantity || 0) + oldItem.quantity;
+      }
     }
   });
 
   // Deduct inventory stock for updated bill items
   editingBillState.items.forEach(newItem => {
-    const prod = state.products.find(p => p.id === newItem.product.id);
-    if (prod) {
-      prod.stockQty = Math.max(0, prod.stockQty - newItem.quantity);
+    const pId = newItem.productId || (newItem.product && newItem.product.id);
+    if (pId) {
+      const prod = state.products.find(p => p.id === pId);
+      if (prod) {
+        prod.quantity = Math.max(0, (prod.quantity || 0) - newItem.quantity);
+      }
     }
   });
 
@@ -2154,10 +2317,11 @@ function saveEditedBill() {
 
   state.saveBills();
   state.saveProducts();
+  updateCounters();
 
   renderInventoryTable();
   renderHistoryTable();
-  renderDashboard();
+  renderAnalytics();
 
   closeEditBillModal();
   showToast(`Bill ${editingBillState.invoiceNumber} updated successfully!`, 'success');
@@ -2173,19 +2337,23 @@ function deleteCurrentEditingBill() {
 
   // Restore inventory stock
   editingBillState.items.forEach(item => {
-    const prod = state.products.find(p => p.id === item.product.id);
-    if (prod) {
-      prod.stockQty += item.quantity;
+    const pId = item.productId || (item.product && item.product.id);
+    if (pId) {
+      const prod = state.products.find(p => p.id === pId);
+      if (prod) {
+        prod.quantity = (prod.quantity || 0) + item.quantity;
+      }
     }
   });
 
   state.bills = state.bills.filter(b => b.id !== editingBillState.id);
   state.saveBills();
   state.saveProducts();
+  updateCounters();
 
   renderInventoryTable();
   renderHistoryTable();
-  renderDashboard();
+  renderAnalytics();
 
   closeEditBillModal();
   showToast(`Bill ${editingBillState.invoiceNumber} deleted and stock restored.`, 'info');
@@ -2420,6 +2588,23 @@ function setupSettings() {
       showToast('Sample grocery inventory loaded!', 'success');
     }
   });
+
+  // Terminal Security Password Settings
+  const secForm = document.getElementById('security-settings-form');
+  const secPassInput = document.getElementById('set-terminal-password');
+  if (secPassInput) {
+    secPassInput.value = getAppPassword();
+  }
+  secForm?.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const newPass = secPassInput?.value.trim();
+    if (!newPass) {
+      showToast('Password cannot be empty!', 'error');
+      return;
+    }
+    localStorage.setItem(STORAGE_KEYS.APP_PASSWORD, newPass);
+    showToast(`Terminal security password updated to: ${newPass}`, 'success');
+  });
 }
 
 // ================= LIVE WEBCAM SCANNER MODULE =================
@@ -2504,6 +2689,9 @@ function closeCameraScanner() {
 // ================= GLOBAL KEYBOARD SHORTCUTS =================
 function setupGlobalShortcuts() {
   window.addEventListener('keydown', (e) => {
+    // If terminal is locked, prevent all shortcuts
+    if (!isTerminalUnlocked()) return;
+
     // If in input field, don't hijack simple keys except function keys
     if (e.key === 'F2') {
       e.preventDefault();
