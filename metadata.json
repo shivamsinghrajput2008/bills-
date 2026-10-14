@@ -1,0 +1,8 @@
+{
+  "name": "Super Bachat Bazzar POS",
+  "description": "Modern Billing, Inventory POS & Barcode Management with Firebase Auth and Cloud Firestore",
+  "permissions": [],
+  "capabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

@@ -1,0 +1,115 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Global Safety Net catch-all default deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() > 0 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function isUserOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isValidProduct(data) {
+      return data.id is string && data.id.size() <= 128
+        && data.name is string && data.name.size() > 0 && data.name.size() <= 200
+        && data.ownerId is string && data.ownerId == request.auth.uid
+        && data.rate is number && data.rate >= 0;
+    }
+
+    function isValidBill(data) {
+      return data.id is string && data.id.size() <= 128
+        && data.invoiceNumber is string && data.invoiceNumber.size() > 0 && data.invoiceNumber.size() <= 64
+        && data.ownerId is string && data.ownerId == request.auth.uid
+        && data.total is number && data.total >= 0;
+    }
+
+    function isValidStoreSettings(data) {
+      return data.storeName is string && data.storeName.size() > 0 && data.storeName.size() <= 150
+        && data.ownerId is string && data.ownerId == request.auth.uid;
+    }
+
+    function isValidSubscription(data) {
+      return data.id is string && data.id.size() <= 128
+        && data.planId is string && data.planId.size() > 0 && data.planId.size() <= 30
+        && data.finalAmount is number && data.finalAmount >= 0
+        && data.ownerId is string && data.ownerId == request.auth.uid
+        && data.status is string && data.status.size() <= 30;
+    }
+
+    match /users/{userId} {
+      allow read, write: if isUserOwner(userId);
+
+      match /products/{productId} {
+        allow read: if isUserOwner(userId);
+        allow create: if isUserOwner(userId)
+          && isValidId(productId)
+          && isValidProduct(incoming())
+          && incoming().id == productId;
+        allow update: if isUserOwner(userId)
+          && isValidId(productId)
+          && isValidProduct(incoming())
+          && incoming().id == existing().id
+          && incoming().ownerId == existing().ownerId;
+        allow delete: if isUserOwner(userId) && isValidId(productId);
+      }
+
+      match /bills/{billId} {
+        allow read: if isUserOwner(userId);
+        allow create: if isUserOwner(userId)
+          && isValidId(billId)
+          && isValidBill(incoming())
+          && incoming().id == billId;
+        allow update: if isUserOwner(userId)
+          && isValidId(billId)
+          && isValidBill(incoming())
+          && incoming().id == existing().id
+          && incoming().ownerId == existing().ownerId;
+        allow delete: if isUserOwner(userId) && isValidId(billId);
+      }
+
+      match /settings/{settingId} {
+        allow read: if isUserOwner(userId);
+        allow create: if isUserOwner(userId)
+          && isValidId(settingId)
+          && isValidStoreSettings(incoming());
+        allow update: if isUserOwner(userId)
+          && isValidId(settingId)
+          && isValidStoreSettings(incoming())
+          && incoming().ownerId == existing().ownerId;
+        allow delete: if isUserOwner(userId) && isValidId(settingId);
+      }
+
+      match /subscriptions/{subscriptionId} {
+        allow read: if isUserOwner(userId);
+        allow create: if isUserOwner(userId)
+          && isValidId(subscriptionId)
+          && isValidSubscription(incoming())
+          && incoming().id == subscriptionId;
+        allow update: if isUserOwner(userId)
+          && isValidId(subscriptionId)
+          && isValidSubscription(incoming())
+          && incoming().id == existing().id
+          && incoming().ownerId == existing().ownerId;
+        allow delete: if isUserOwner(userId) && isValidId(subscriptionId);
+      }
+    }
+  }
+}

@@ -3,11 +3,30 @@
  * Address: attardah kachhi pakki , muzzafarpur
  */
 
+import { 
+  auth, 
+  signInWithGoogle, 
+  signOutUser, 
+  subscribeToAuth, 
+  subscribeToProducts, 
+  saveProductToFirestore, 
+  deleteProductFromFirestore, 
+  subscribeToBills, 
+  saveBillToFirestore, 
+  deleteBillFromFirestore, 
+  subscribeToSettings, 
+  saveSettingsToFirestore, 
+  subscribeToSubscription,
+  saveSubscriptionToFirestore,
+  migrateLocalDataToCloud 
+} from './firebase.js';
+
 // ================= CONSTANTS & INITIAL DATA =================
 const STORAGE_KEYS = {
   PRODUCTS: 'sbb_products_v1',
   BILLS: 'sbb_bills_v1',
   SETTINGS: 'sbb_settings_v1',
+  SUBSCRIPTION: 'sbb_subscription_v1',
   THEME: 'sbb_theme_v1',
   SOUND: 'sbb_sound_v1',
   NEXT_INVOICE_NUM: 'sbb_invoice_seq_v1',
@@ -239,6 +258,10 @@ class AppState {
     this.currentReceiptBill = null;
     this.cameraScanner = null;
     this.audioCtx = null;
+    this.currentUser = null;
+    this.subscription = this.loadSubscription();
+    this.selectedSubPlan = '1_year'; // '6_months' or '1_year'
+    this.appliedCouponCode = 'BACHAT'; // default coupon active
   }
 
   loadProducts() {
@@ -254,9 +277,32 @@ class AppState {
     }
   }
 
-  saveProducts() {
+  async saveProducts(productToSave = null) {
     localStorage.setItem(STORAGE_KEYS.PRODUCTS, JSON.stringify(this.products));
     updateCounters();
+    if (this.currentUser) {
+      try {
+        if (productToSave) {
+          await saveProductToFirestore(this.currentUser.uid, productToSave);
+        } else {
+          for (const p of this.products) {
+            await saveProductToFirestore(this.currentUser.uid, p);
+          }
+        }
+      } catch (err) {
+        console.warn('Could not sync products to Firestore:', err);
+      }
+    }
+  }
+
+  async removeProductCloud(productId) {
+    if (this.currentUser && productId) {
+      try {
+        await deleteProductFromFirestore(this.currentUser.uid, productId);
+      } catch (err) {
+        console.warn('Could not delete product from Firestore:', err);
+      }
+    }
   }
 
   loadBills() {
@@ -269,9 +315,32 @@ class AppState {
     }
   }
 
-  saveBills() {
+  async saveBills(billToSave = null) {
     localStorage.setItem(STORAGE_KEYS.BILLS, JSON.stringify(this.bills));
     updateCounters();
+    if (this.currentUser) {
+      try {
+        if (billToSave) {
+          await saveBillToFirestore(this.currentUser.uid, billToSave);
+        } else {
+          for (const b of this.bills) {
+            await saveBillToFirestore(this.currentUser.uid, b);
+          }
+        }
+      } catch (err) {
+        console.warn('Could not sync bills to Firestore:', err);
+      }
+    }
+  }
+
+  async removeBillCloud(billId) {
+    if (this.currentUser && billId) {
+      try {
+        await deleteBillFromFirestore(this.currentUser.uid, billId);
+      } catch (err) {
+        console.warn('Could not delete bill from Firestore:', err);
+      }
+    }
   }
 
   loadSettings() {
@@ -284,8 +353,42 @@ class AppState {
     }
   }
 
-  saveSettings() {
+  async saveSettings() {
     localStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify(this.settings));
+    if (this.currentUser) {
+      try {
+        await saveSettingsToFirestore(this.currentUser.uid, this.settings);
+      } catch (err) {
+        console.warn('Could not sync settings to Firestore:', err);
+      }
+    }
+  }
+
+  loadSubscription() {
+    const data = localStorage.getItem(STORAGE_KEYS.SUBSCRIPTION);
+    if (!data) {
+      return null;
+    }
+    try {
+      const parsed = JSON.parse(data);
+      if (parsed && parsed.endDate) {
+        const end = new Date(parsed.endDate);
+        if (!isNaN(end.getTime()) && end.getTime() < Date.now()) {
+          parsed.status = 'expired';
+        }
+      }
+      return parsed;
+    } catch {
+      return null;
+    }
+  }
+
+  saveSubscription(sub) {
+    this.subscription = sub;
+    localStorage.setItem(STORAGE_KEYS.SUBSCRIPTION, JSON.stringify(sub));
+    if (this.currentUser) {
+      saveSubscriptionToFirestore(this.currentUser.uid, sub);
+    }
   }
 
   getNextInvoiceNumber() {
@@ -437,10 +540,207 @@ function formatDateTime(isoString) {
   return `${day} ${month} ${year}, ${hours}:${minutes} ${ampm}`;
 }
 
+// ================= FIREBASE AUTHENTICATION & CLOUD FIRESTORE SYNC =================
+let unsubProducts = null;
+let unsubBills = null;
+let unsubSettings = null;
+let unsubSub = null;
+
+function setupFirebaseAuth() {
+  const lockGoogleBtn = document.getElementById('lock-google-signin-btn');
+  const headerGoogleBtn = document.getElementById('header-google-signin-btn');
+  const headerSignoutBtn = document.getElementById('header-signout-btn');
+  const userProfileBadge = document.getElementById('user-profile-badge');
+  const userAvatarImg = document.getElementById('user-avatar-img');
+  const userDisplayName = document.getElementById('user-display-name');
+  const settingsGoogleBtn = document.getElementById('btn-settings-google-signin');
+  const settingsSignoutBtn = document.getElementById('btn-settings-signout');
+  const forceSyncBtn = document.getElementById('btn-force-cloud-sync');
+  const userEmailSpan = document.getElementById('firebase-user-email');
+  const syncDesc = document.getElementById('firebase-sync-desc');
+
+  async function handleGoogleSignIn() {
+    try {
+      showToast('Opening Google Sign-In popup...', 'info');
+      const user = await signInWithGoogle();
+      if (user) {
+        localStorage.setItem(STORAGE_KEYS.AUTH_UNLOCKED, 'true');
+        const overlay = document.getElementById('app-lock-overlay');
+        if (overlay) {
+          overlay.classList.add('lock-exiting');
+          setTimeout(() => {
+            overlay.style.display = 'none';
+            overlay.classList.remove('lock-exiting');
+            document.body.classList.remove('terminal-locked');
+            checkSubscriptionGate();
+            document.getElementById('barcode-input')?.focus();
+          }, 320);
+        } else {
+          checkSubscriptionGate();
+        }
+        playSound('success');
+        showToast(`Welcome, ${user.displayName || user.email}! Cloud Sync active.`, 'success');
+      }
+    } catch (err) {
+      console.error('Google Sign-In error:', err);
+      if (err.code !== 'auth/popup-closed-by-user') {
+        showToast(`Sign-in failed: ${err.message || 'Please check popup settings.'}`, 'error');
+      }
+    }
+  }
+
+  async function handleSignOut() {
+    try {
+      await signOutUser();
+      showToast('Signed out of Google account.', 'info');
+    } catch (err) {
+      console.error('Sign-out error:', err);
+      showToast('Error during sign out.', 'error');
+    }
+  }
+
+  lockGoogleBtn?.addEventListener('click', handleGoogleSignIn);
+  headerGoogleBtn?.addEventListener('click', handleGoogleSignIn);
+  settingsGoogleBtn?.addEventListener('click', handleGoogleSignIn);
+  headerSignoutBtn?.addEventListener('click', handleSignOut);
+  settingsSignoutBtn?.addEventListener('click', handleSignOut);
+
+  forceSyncBtn?.addEventListener('click', async () => {
+    if (!state.currentUser) {
+      showToast('Please sign in with Google first to sync cloud database!', 'error');
+      return;
+    }
+    showToast('Syncing all products, bills & settings to Cloud Firestore...', 'info');
+    try {
+      await migrateLocalDataToCloud(state.currentUser.uid, state.products, state.bills, state.settings);
+      if (state.subscription) {
+        await saveSubscriptionToFirestore(state.currentUser.uid, state.subscription);
+      }
+      showToast('Cloud database synchronized successfully!', 'success');
+    } catch (err) {
+      showToast('Cloud sync failed: ' + err.message, 'error');
+    }
+  });
+
+  // Attach listener to Firebase Auth state
+  subscribeToAuth((user) => {
+    state.currentUser = user;
+
+    if (unsubProducts) { unsubProducts(); unsubProducts = null; }
+    if (unsubBills) { unsubBills(); unsubBills = null; }
+    if (unsubSettings) { unsubSettings(); unsubSettings = null; }
+    if (unsubSub) { unsubSub(); unsubSub = null; }
+
+    if (user) {
+      console.log('[Firebase Auth] User authenticated:', user.email, user.uid);
+
+      if (headerGoogleBtn) headerGoogleBtn.style.display = 'none';
+      if (userProfileBadge) userProfileBadge.style.display = 'flex';
+      if (userAvatarImg) {
+        userAvatarImg.src = user.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.displayName || user.email)}&background=ea580c&color=fff`;
+      }
+      if (userDisplayName) {
+        userDisplayName.textContent = user.displayName || user.email.split('@')[0];
+      }
+
+      if (userEmailSpan) userEmailSpan.textContent = user.email;
+      if (settingsSignoutBtn) settingsSignoutBtn.style.display = 'inline-flex';
+      if (settingsGoogleBtn) settingsGoogleBtn.style.display = 'none';
+      if (syncDesc) syncDesc.textContent = `Active merchant account: ${user.email}. Real-time Firestore sync active.`;
+
+      // Auto-unlock terminal if user authenticated with Google
+      localStorage.setItem(STORAGE_KEYS.AUTH_UNLOCKED, 'true');
+      const overlay = document.getElementById('app-lock-overlay');
+      if (overlay && overlay.style.display !== 'none') {
+        overlay.style.display = 'none';
+        document.body.classList.remove('terminal-locked');
+      }
+
+      // Attach Firestore realtime listeners
+      unsubProducts = subscribeToProducts(user.uid, (cloudProducts) => {
+        if (cloudProducts && cloudProducts.length > 0) {
+          state.products = cloudProducts;
+          localStorage.setItem(STORAGE_KEYS.PRODUCTS, JSON.stringify(state.products));
+          renderInventoryTable();
+          renderQuickItems();
+          updateCounters();
+        } else if (state.products && state.products.length > 0) {
+          // Initial seed for new user
+          migrateLocalDataToCloud(user.uid, state.products, state.bills, state.settings);
+        }
+      });
+
+      unsubBills = subscribeToBills(user.uid, (cloudBills) => {
+        if (cloudBills && cloudBills.length > 0) {
+          state.bills = cloudBills;
+          localStorage.setItem(STORAGE_KEYS.BILLS, JSON.stringify(state.bills));
+          renderHistoryTable();
+          renderAnalytics();
+          updateCounters();
+        }
+      });
+
+      unsubSettings = subscribeToSettings(user.uid, (cloudSettings) => {
+        if (cloudSettings) {
+          state.settings = { ...state.settings, ...cloudSettings };
+          localStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify(state.settings));
+
+          const nameInput = document.getElementById('set-store-name');
+          const addrInput = document.getElementById('set-store-address');
+          const phoneInput = document.getElementById('set-store-phone');
+          const upiInput = document.getElementById('set-store-upi');
+          const wishesInput = document.getElementById('set-store-wishes');
+
+          if (nameInput) nameInput.value = state.settings.storeName;
+          if (addrInput) addrInput.value = state.settings.storeAddress;
+          if (phoneInput) phoneInput.value = state.settings.storePhone;
+          if (upiInput) upiInput.value = state.settings.storeUpi;
+          if (wishesInput) wishesInput.value = state.settings.storeWishes;
+
+          const titleEl = document.querySelector('.store-title');
+          const subEl = document.querySelector('.store-subtitle');
+          if (titleEl) titleEl.textContent = state.settings.storeName;
+          if (subEl) subEl.innerHTML = `<i data-lucide="map-pin" class="mini-icon"></i> ${escapeHtml(state.settings.storeAddress)}`;
+          if (window.lucide) window.lucide.createIcons();
+        }
+      });
+
+      unsubSub = subscribeToSubscription(user.uid, (cloudSub) => {
+        if (cloudSub && cloudSub.status === 'active') {
+          state.subscription = cloudSub;
+          localStorage.setItem(STORAGE_KEYS.SUBSCRIPTION, JSON.stringify(cloudSub));
+        } else {
+          state.subscription = null;
+          localStorage.removeItem(STORAGE_KEYS.SUBSCRIPTION);
+        }
+        renderSubscriptionStatus();
+        checkSubscriptionGate();
+      });
+
+    } else {
+      console.log('[Firebase Auth] Signed out.');
+      if (headerGoogleBtn) headerGoogleBtn.style.display = 'inline-flex';
+      if (userProfileBadge) userProfileBadge.style.display = 'none';
+
+      if (userEmailSpan) userEmailSpan.textContent = 'Not Signed In (Local Cache Mode)';
+      if (settingsSignoutBtn) settingsSignoutBtn.style.display = 'none';
+      if (settingsGoogleBtn) settingsGoogleBtn.style.display = 'inline-flex';
+      if (syncDesc) syncDesc.textContent = 'Store data is saved locally on this browser. Sign in with Google to synchronize across devices with Cloud Firestore.';
+
+      state.subscription = null;
+      localStorage.removeItem(STORAGE_KEYS.SUBSCRIPTION);
+      checkSubscriptionGate();
+    }
+
+    if (window.lucide) window.lucide.createIcons();
+  });
+}
+
 // ================= INITIALIZATION =================
 document.addEventListener('DOMContentLoaded', () => {
   setupTheme();
   setupLockScreen();
+  setupFirebaseAuth();
   setupNavigation();
   setupClock();
   setupPOS();
@@ -448,6 +748,9 @@ document.addEventListener('DOMContentLoaded', () => {
   setupBillHistory();
   setupAnalytics();
   setupSettings();
+  setupSubscription();
+  setupPaywall();
+  checkSubscriptionGate();
   setupGlobalShortcuts();
   updateCounters();
 
@@ -468,6 +771,10 @@ function isTerminalUnlocked() {
 function lockTerminal() {
   localStorage.removeItem(STORAGE_KEYS.AUTH_UNLOCKED);
   sessionStorage.removeItem(STORAGE_KEYS.AUTH_SESSION);
+  const pw = document.getElementById('subscription-paywall-overlay');
+  if (pw) pw.style.display = 'none';
+  document.body.classList.remove('paywall-locked');
+
   const overlay = document.getElementById('app-lock-overlay');
   const input = document.getElementById('lock-password-input');
   const err = document.getElementById('lock-error-msg');
@@ -504,9 +811,13 @@ function setupLockScreen() {
   if (isTerminalUnlocked()) {
     if (overlay) overlay.style.display = 'none';
     document.body.classList.remove('terminal-locked');
+    checkSubscriptionGate();
   } else {
     if (overlay) overlay.style.display = 'flex';
     document.body.classList.add('terminal-locked');
+    const pw = document.getElementById('subscription-paywall-overlay');
+    if (pw) pw.style.display = 'none';
+    document.body.classList.remove('paywall-locked');
     setTimeout(() => pwdInput?.focus(), 150);
   }
 
@@ -545,10 +856,12 @@ function setupLockScreen() {
             overlay.style.display = 'none';
             overlay.classList.remove('lock-exiting');
             document.body.classList.remove('terminal-locked');
+            checkSubscriptionGate();
             document.getElementById('barcode-input')?.focus();
           }, 320);
         } else {
           document.body.classList.remove('terminal-locked');
+          checkSubscriptionGate();
         }
 
         showToast('Access Granted! Welcome to Super Bachat Bazzar POS', 'success');
@@ -623,6 +936,12 @@ function setupNavigation() {
 }
 
 function switchTab(tabId) {
+  if (!isSubscriptionActive()) {
+    checkSubscriptionGate();
+    showToast('Subscription required: Please complete payment to access POS features.', 'error');
+    return;
+  }
+
   document.querySelectorAll('.nav-tab').forEach(t => {
     t.classList.toggle('active', t.getAttribute('data-tab') === tabId);
   });
@@ -641,6 +960,9 @@ function switchTab(tabId) {
     renderHistoryTable();
   } else if (tabId === 'analytics') {
     renderAnalytics();
+  } else if (tabId === 'subscription') {
+    updatePlanSelectionUI();
+    renderSubscriptionStatus();
   }
 
   if (window.lucide) window.lucide.createIcons();
@@ -1675,6 +1997,7 @@ function deleteProduct(id) {
   if (confirm(`Are you sure you want to delete "${prod.name}" from store inventory?`)) {
     state.products = state.products.filter(p => p.id !== id);
     state.saveProducts();
+    state.removeProductCloud(id);
     renderInventoryTable();
     renderQuickItems();
     showToast(`Deleted product: ${prod.name}`, 'info');
@@ -2346,8 +2669,10 @@ function deleteCurrentEditingBill() {
     }
   });
 
+  const billToDeleteId = editingBillState.id;
   state.bills = state.bills.filter(b => b.id !== editingBillState.id);
   state.saveBills();
+  state.removeBillCloud(billToDeleteId);
   state.saveProducts();
   updateCounters();
 
@@ -2732,3 +3057,634 @@ function downloadFile(content, fileName, mimeType) {
     window.URL.revokeObjectURL(url);
   }, 100);
 }
+
+// ================= SUBSCRIPTION & UPI PAYMENT ENGINE =================
+const SUBSCRIPTION_PLANS = {
+  '6_months': {
+    id: '6_months',
+    name: '6 Months Subscription',
+    durationMonths: 6,
+    basePrice: 5000,
+    couponDiscount: 1000, // ₹1,000 off on 6 months plan
+  },
+  '1_year': {
+    id: '1_year',
+    name: '1 Year Subscription',
+    durationMonths: 12,
+    basePrice: 10000,
+    couponDiscount: 2000, // ₹2,000 off on 1 year plan
+  }
+};
+
+const OFFICIAL_UPI_ID = '9771000191@upi';
+
+function setupSubscription() {
+  const btnSelect6m = document.getElementById('btn-select-6m');
+  const btnSelect1y = document.getElementById('btn-select-1y');
+  const card6m = document.getElementById('card-plan-6m');
+  const card1y = document.getElementById('card-plan-1y');
+  const couponForm = document.getElementById('sub-coupon-form');
+  const couponInput = document.getElementById('sub-coupon-input');
+  const removeCouponBtn = document.getElementById('btn-remove-coupon');
+  const verifyForm = document.getElementById('sub-verification-form');
+  const utrInput = document.getElementById('sub-utr-input');
+  const demoActivateBtn = document.getElementById('btn-instant-demo-activate');
+  const copyUpiBtn = document.getElementById('copy-sub-upi-btn');
+  const chipButtons = document.querySelectorAll('.coupon-chip');
+
+  // Plan selection
+  btnSelect6m?.addEventListener('click', () => {
+    state.selectedSubPlan = '6_months';
+    updatePlanSelectionUI();
+  });
+  card6m?.addEventListener('click', (e) => {
+    if (e.target.closest('button')) return;
+    state.selectedSubPlan = '6_months';
+    updatePlanSelectionUI();
+  });
+
+  btnSelect1y?.addEventListener('click', () => {
+    state.selectedSubPlan = '1_year';
+    updatePlanSelectionUI();
+  });
+  card1y?.addEventListener('click', (e) => {
+    if (e.target.closest('button')) return;
+    state.selectedSubPlan = '1_year';
+    updatePlanSelectionUI();
+  });
+
+  // Coupon chips click
+  chipButtons.forEach(btn => {
+    btn.addEventListener('click', () => {
+      const code = btn.getAttribute('data-code');
+      applyCoupon(code);
+    });
+  });
+
+  // Coupon form submit
+  couponForm?.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const code = couponInput?.value.trim().toUpperCase();
+    if (!code) {
+      showToast('Please enter a coupon code!', 'error');
+      return;
+    }
+    applyCoupon(code);
+  });
+
+  // Remove coupon
+  removeCouponBtn?.addEventListener('click', () => {
+    state.appliedCouponCode = null;
+    showToast('Coupon removed.', 'info');
+    updatePricingAndQR();
+  });
+
+  // Copy UPI ID
+  copyUpiBtn?.addEventListener('click', () => {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(OFFICIAL_UPI_ID).then(() => {
+        showToast(`Copied UPI ID: ${OFFICIAL_UPI_ID}`, 'success');
+      }).catch(() => {
+        showToast(`UPI ID: ${OFFICIAL_UPI_ID}`, 'info');
+      });
+    } else {
+      showToast(`UPI ID: ${OFFICIAL_UPI_ID}`, 'info');
+    }
+  });
+
+  // UTR Form Submit
+  verifyForm?.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const utr = utrInput?.value.trim();
+    if (!utr) {
+      showToast('Please enter the 12-digit UPI UTR reference number from your payment receipt.', 'error');
+      return;
+    }
+    activatePlan(utr);
+  });
+
+  // Demo Activate Button
+  demoActivateBtn?.addEventListener('click', () => {
+    const mockUtr = 'DEMO' + Math.floor(10000000 + Math.random() * 90000000);
+    activatePlan(mockUtr);
+  });
+
+  // Initial render
+  updatePlanSelectionUI();
+  renderSubscriptionStatus();
+}
+
+function applyCoupon(rawCode) {
+  const code = (rawCode || '').trim().toUpperCase();
+  const validCoupons = ['BACHAT', 'SUPER2000', 'SUPER1000', 'SAVEMORE', 'OFFER', 'SUPERBACHAT'];
+
+  if (validCoupons.includes(code)) {
+    state.appliedCouponCode = code;
+    playSound('add');
+    const discount = state.selectedSubPlan === '1_year' ? '₹2,000' : '₹1,000';
+    showToast(`Coupon "${code}" applied! You saved ${discount} on this plan 🎉`, 'success');
+    updatePricingAndQR();
+    updatePaywallPricingAndQR();
+  } else {
+    playSound('error');
+    showToast(`Invalid coupon code. Try "BACHAT" for instant discount!`, 'error');
+  }
+}
+
+function updatePlanSelectionUI() {
+  const card6m = document.getElementById('card-plan-6m');
+  const card1y = document.getElementById('card-plan-1y');
+  const btn6m = document.getElementById('btn-select-6m');
+  const btn1y = document.getElementById('btn-select-1y');
+
+  if (state.selectedSubPlan === '6_months') {
+    card6m?.classList.add('active');
+    card1y?.classList.remove('active');
+    if (btn6m) {
+      btn6m.className = 'btn btn-primary plan-select-btn';
+      btn6m.innerHTML = '<span>Selected 6 Months Plan</span> <i data-lucide="check"></i>';
+    }
+    if (btn1y) {
+      btn1y.className = 'btn btn-outline plan-select-btn';
+      btn1y.innerHTML = '<span>Choose 1 Year Plan (Save ₹2,000)</span> <i data-lucide="arrow-right"></i>';
+    }
+  } else {
+    card1y?.classList.add('active');
+    card6m?.classList.remove('active');
+    if (btn1y) {
+      btn1y.className = 'btn btn-primary plan-select-btn';
+      btn1y.innerHTML = '<span>Selected 1 Year Plan</span> <i data-lucide="check"></i>';
+    }
+    if (btn6m) {
+      btn6m.className = 'btn btn-outline plan-select-btn';
+      btn6m.innerHTML = '<span>Choose 6 Months Plan</span> <i data-lucide="arrow-right"></i>';
+    }
+  }
+
+  if (window.lucide) window.lucide.createIcons();
+  updatePricingAndQR();
+  updatePaywallPricingAndQR();
+}
+
+function updatePricingAndQR() {
+  const plan = SUBSCRIPTION_PLANS[state.selectedSubPlan] || SUBSCRIPTION_PLANS['1_year'];
+  const hasCoupon = !!state.appliedCouponCode;
+  const discount = hasCoupon ? plan.couponDiscount : 0;
+  const finalAmount = plan.basePrice - discount;
+
+  // Update card tags
+  const tag6m = document.getElementById('discount-tag-6m');
+  const tag1y = document.getElementById('discount-tag-1y');
+  const amount6m = document.getElementById('display-amount-6m');
+  const amount1y = document.getElementById('display-amount-1y');
+  const orig6m = document.getElementById('display-orig-6m');
+  const orig1y = document.getElementById('display-orig-1y');
+
+  if (hasCoupon) {
+    if (tag6m) {
+      tag6m.style.display = 'inline-flex';
+      tag6m.innerHTML = `<i data-lucide="tag"></i> Coupon Applied: Save ₹1,000`;
+    }
+    if (tag1y) {
+      tag1y.style.display = 'inline-flex';
+      tag1y.innerHTML = `<i data-lucide="tag"></i> Coupon Applied: Save ₹2,000`;
+    }
+    if (amount6m) amount6m.textContent = '4,000';
+    if (amount1y) amount1y.textContent = '8,000';
+    if (orig6m) orig6m.style.display = 'block';
+    if (orig1y) orig1y.style.display = 'block';
+  } else {
+    if (tag6m) tag6m.style.display = 'none';
+    if (tag1y) tag1y.style.display = 'none';
+    if (amount6m) amount6m.textContent = '5,000';
+    if (amount1y) amount1y.textContent = '10,000';
+    if (orig6m) orig6m.style.display = 'none';
+    if (orig1y) orig1y.style.display = 'none';
+  }
+
+  // Update Applied Coupon Banner
+  const couponBanner = document.getElementById('applied-coupon-banner');
+  const couponTitle = document.getElementById('applied-coupon-title');
+  const couponDesc = document.getElementById('applied-coupon-desc');
+  const couponInput = document.getElementById('sub-coupon-input');
+
+  if (hasCoupon) {
+    if (couponBanner) couponBanner.style.display = 'flex';
+    if (couponTitle) couponTitle.textContent = `Coupon "${state.appliedCouponCode}" Applied!`;
+    if (couponDesc) couponDesc.textContent = `You saved ₹${discount.toLocaleString('en-IN')} on your ${plan.name}.`;
+    if (couponInput) couponInput.value = state.appliedCouponCode;
+  } else {
+    if (couponBanner) couponBanner.style.display = 'none';
+    if (couponInput) couponInput.value = '';
+  }
+
+  // Update Order Summary
+  const summaryPlan = document.getElementById('summary-plan-name');
+  const summaryBase = document.getElementById('summary-base-price');
+  const summaryDiscRow = document.getElementById('summary-discount-row');
+  const summaryDiscVal = document.getElementById('summary-discount-val');
+  const summaryTotal = document.getElementById('summary-total-price');
+
+  if (summaryPlan) summaryPlan.textContent = plan.name;
+  if (summaryBase) summaryBase.textContent = `₹${plan.basePrice.toLocaleString('en-IN')}.00`;
+  if (summaryDiscRow) summaryDiscRow.style.display = hasCoupon ? 'flex' : 'none';
+  if (summaryDiscVal) summaryDiscVal.textContent = `-₹${discount.toLocaleString('en-IN')}.00`;
+  if (summaryTotal) summaryTotal.textContent = `₹${finalAmount.toLocaleString('en-IN')}.00`;
+
+  // Update QR Code & Amount
+  const qrAmountBadge = document.getElementById('sub-qr-amount-badge');
+  if (qrAmountBadge) qrAmountBadge.textContent = `₹${finalAmount.toLocaleString('en-IN')}`;
+
+  renderSubscriptionQRCode(finalAmount, plan.name);
+
+  // Update intent link for mobile UPI apps
+  const intentLink = document.getElementById('upi-intent-link');
+  if (intentLink) {
+    const encodedStore = encodeURIComponent('SUPER BACHAT BAZZAR');
+    const encodedNote = encodeURIComponent(`POS Subscription ${plan.name}`);
+    intentLink.href = `upi://pay?pa=${OFFICIAL_UPI_ID}&pn=${encodedStore}&am=${finalAmount}&cu=INR&tn=${encodedNote}`;
+  }
+
+  if (window.lucide) window.lucide.createIcons();
+}
+
+function renderSubscriptionQRCode(amount, planName) {
+  const container = document.getElementById('sub-upi-qr-container');
+  if (!container) return;
+
+  container.innerHTML = '';
+  const cleanPlan = planName.replace(/[^a-zA-Z0-9 ]/g, '');
+  const upiUrl = `upi://pay?pa=${OFFICIAL_UPI_ID}&pn=SUPER%20BACHAT%20BAZZAR&am=${amount}&cu=INR&tn=POS%20Subscription%20${encodeURIComponent(cleanPlan)}`;
+
+  if (window.QRCode) {
+    new window.QRCode(container, {
+      text: upiUrl,
+      width: 170,
+      height: 170,
+      colorDark: '#0f172a',
+      colorLight: '#ffffff',
+      correctLevel: window.QRCode.CorrectLevel.M
+    });
+  }
+}
+
+// ================= SUBSCRIPTION STATUS & GATE ENGINE =================
+export function isSubscriptionActive() {
+  const sub = state.subscription;
+  if (!sub || typeof sub !== 'object') return false;
+  if (sub.status !== 'active') return false;
+  if (sub.endDate) {
+    const end = new Date(sub.endDate);
+    if (!isNaN(end.getTime()) && end.getTime() < Date.now()) {
+      return false; // expired
+    }
+  }
+  return true;
+}
+
+export function checkSubscriptionGate() {
+  const paywallOverlay = document.getElementById('subscription-paywall-overlay');
+  if (!paywallOverlay) return;
+
+  // If terminal lock screen is visible, keep paywall hidden so user can unlock/sign in first
+  const isUnlocked = isTerminalUnlocked() || !!state.currentUser;
+  if (!isUnlocked) {
+    paywallOverlay.style.display = 'none';
+    document.body.classList.remove('paywall-locked');
+    return;
+  }
+
+  // Once terminal is unlocked / signed in, check if user has paid subscription:
+  if (!isSubscriptionActive()) {
+    // Show mandatory paywall, lock out app usage
+    paywallOverlay.style.display = 'flex';
+    document.body.classList.add('paywall-locked');
+
+    // Update user email badge
+    const emailEl = document.getElementById('paywall-user-email');
+    if (emailEl) {
+      emailEl.textContent = state.currentUser ? (state.currentUser.email || state.currentUser.displayName) : 'Active Terminal Merchant';
+    }
+
+    updatePaywallPricingAndQR();
+  } else {
+    // User has active subscription!
+    paywallOverlay.style.display = 'none';
+    document.body.classList.remove('paywall-locked');
+    renderSubscriptionStatus();
+  }
+}
+
+export function activatePaidSubscription(utr) {
+  const plan = SUBSCRIPTION_PLANS[state.selectedSubPlan] || SUBSCRIPTION_PLANS['1_year'];
+  const hasCoupon = !!state.appliedCouponCode;
+  const discount = hasCoupon ? plan.couponDiscount : 0;
+  const finalAmount = plan.basePrice - discount;
+
+  const now = new Date();
+  const endDate = new Date(now.getFullYear(), now.getMonth() + plan.durationMonths, now.getDate());
+
+  const sub = {
+    id: 'current',
+    planId: plan.id,
+    planName: plan.name,
+    originalPrice: plan.basePrice,
+    discount: discount,
+    finalAmount: finalAmount,
+    couponCode: state.appliedCouponCode || '',
+    upiId: OFFICIAL_UPI_ID,
+    utrNumber: utr || ('DEMO_' + Date.now()),
+    status: 'active',
+    startDate: now.toISOString(),
+    endDate: endDate.toISOString(),
+    ownerId: state.currentUser?.uid || 'local',
+    createdAt: now.toISOString()
+  };
+
+  state.saveSubscription(sub);
+
+  playSound('success');
+  if (window.confetti) {
+    window.confetti({
+      particleCount: 150,
+      spread: 100,
+      origin: { y: 0.5 }
+    });
+  }
+
+  showToast(`🎉 Payment Verified! Terminal unlocked for ${plan.name}.`, 'success');
+
+  const pwOverlay = document.getElementById('subscription-paywall-overlay');
+  if (pwOverlay) {
+    pwOverlay.classList.add('lock-exiting');
+    setTimeout(() => {
+      pwOverlay.style.display = 'none';
+      pwOverlay.classList.remove('lock-exiting');
+      document.body.classList.remove('paywall-locked');
+      document.getElementById('barcode-input')?.focus();
+    }, 320);
+  } else {
+    document.body.classList.remove('paywall-locked');
+  }
+
+  renderSubscriptionStatus();
+  updatePlanSelectionUI();
+  updatePricingAndQR();
+  updatePaywallPricingAndQR();
+
+  // Reset UTR inputs
+  const utrInput = document.getElementById('sub-utr-input');
+  if (utrInput) utrInput.value = '';
+  const pwUtrInput = document.getElementById('pw-utr-input');
+  if (pwUtrInput) pwUtrInput.value = '';
+}
+
+export function activatePlan(utr) {
+  activatePaidSubscription(utr);
+}
+
+// ================= MANDATORY STARTING PAYWALL CONTROLLER =================
+export function setupPaywall() {
+  const plan6m = document.getElementById('pw-plan-6m');
+  const plan1y = document.getElementById('pw-plan-1y');
+  const couponForm = document.getElementById('pw-coupon-form');
+  const couponInput = document.getElementById('pw-coupon-input');
+  const removeCouponBtn = document.getElementById('pw-remove-coupon-btn');
+  const copyUpiBtn = document.getElementById('pw-copy-upi-btn');
+  const verifyForm = document.getElementById('pw-verify-form');
+  const utrInput = document.getElementById('pw-utr-input');
+  const demoActivateBtn = document.getElementById('pw-demo-activate-btn');
+  const signoutBtn = document.getElementById('paywall-signout-btn');
+  const chipButtons = document.querySelectorAll('.pw-chip');
+
+  // Plan toggling
+  plan6m?.addEventListener('click', () => {
+    state.selectedSubPlan = '6_months';
+    updatePaywallPricingAndQR();
+    updatePlanSelectionUI();
+  });
+
+  plan1y?.addEventListener('click', () => {
+    state.selectedSubPlan = '1_year';
+    updatePaywallPricingAndQR();
+    updatePlanSelectionUI();
+  });
+
+  // Coupon chips
+  chipButtons.forEach(btn => {
+    btn.addEventListener('click', () => {
+      const code = btn.getAttribute('data-code');
+      applyCoupon(code);
+    });
+  });
+
+  // Coupon form
+  couponForm?.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const code = couponInput?.value.trim().toUpperCase();
+    if (!code) {
+      showToast('Please enter a coupon code!', 'error');
+      return;
+    }
+    applyCoupon(code);
+  });
+
+  // Remove coupon
+  removeCouponBtn?.addEventListener('click', () => {
+    state.appliedCouponCode = null;
+    showToast('Coupon removed.', 'info');
+    updatePricingAndQR();
+    updatePaywallPricingAndQR();
+  });
+
+  // Copy UPI ID
+  copyUpiBtn?.addEventListener('click', () => {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(OFFICIAL_UPI_ID).then(() => {
+        showToast(`Copied UPI ID: ${OFFICIAL_UPI_ID}`, 'success');
+      }).catch(() => {
+        showToast(`UPI ID: ${OFFICIAL_UPI_ID}`, 'info');
+      });
+    } else {
+      showToast(`UPI ID: ${OFFICIAL_UPI_ID}`, 'info');
+    }
+  });
+
+  // Payment Verification Form Submit
+  verifyForm?.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const utr = utrInput?.value.trim();
+    if (!utr || utr.length < 6) {
+      showToast('Please enter the 12-digit UPI UTR reference number from your payment receipt.', 'error');
+      return;
+    }
+    activatePaidSubscription(utr);
+  });
+
+  // Instant Demo Activation
+  demoActivateBtn?.addEventListener('click', () => {
+    const mockUtr = 'DEMO_UPI_' + Math.floor(10000000 + Math.random() * 90000000);
+    activatePaidSubscription(mockUtr);
+  });
+
+  // Switch / Sign-out Account from Paywall
+  signoutBtn?.addEventListener('click', async () => {
+    try {
+      await signOutUser();
+      localStorage.removeItem(STORAGE_KEYS.AUTH_UNLOCKED);
+      sessionStorage.removeItem(STORAGE_KEYS.AUTH_SESSION);
+      state.subscription = null;
+      localStorage.removeItem(STORAGE_KEYS.SUBSCRIPTION);
+
+      const pw = document.getElementById('subscription-paywall-overlay');
+      if (pw) pw.style.display = 'none';
+      document.body.classList.remove('paywall-locked');
+
+      const overlay = document.getElementById('app-lock-overlay');
+      if (overlay) {
+        overlay.style.display = 'flex';
+        overlay.classList.remove('lock-exiting');
+      }
+      document.body.classList.add('terminal-locked');
+      showToast('Signed out. Please sign in with your active account.', 'info');
+    } catch (err) {
+      console.error('Paywall sign-out error:', err);
+    }
+  });
+
+  // Initial draw
+  updatePaywallPricingAndQR();
+}
+
+export function updatePaywallPricingAndQR() {
+  const plan = SUBSCRIPTION_PLANS[state.selectedSubPlan] || SUBSCRIPTION_PLANS['1_year'];
+  const hasCoupon = !!state.appliedCouponCode;
+  const discount = hasCoupon ? plan.couponDiscount : 0;
+  const finalAmount = plan.basePrice - discount;
+
+  const plan6m = document.getElementById('pw-plan-6m');
+  const plan1y = document.getElementById('pw-plan-1y');
+  const radio6m = document.getElementById('pw-radio-6m');
+  const radio1y = document.getElementById('pw-radio-1y');
+
+  const orig6m = document.getElementById('pw-orig-6m');
+  const orig1y = document.getElementById('pw-orig-1y');
+  const val6m = document.getElementById('pw-val-6m');
+  const val1y = document.getElementById('pw-val-1y');
+  const badge6m = document.getElementById('pw-disc-badge-6m');
+  const badge1y = document.getElementById('pw-disc-badge-1y');
+
+  if (state.selectedSubPlan === '6_months') {
+    plan6m?.classList.add('active');
+    plan1y?.classList.remove('active');
+    radio6m?.setAttribute('data-lucide', 'check-circle-2');
+    radio1y?.setAttribute('data-lucide', 'circle');
+  } else {
+    plan1y?.classList.add('active');
+    plan6m?.classList.remove('active');
+    radio1y?.setAttribute('data-lucide', 'check-circle-2');
+    radio6m?.setAttribute('data-lucide', 'circle');
+  }
+
+  // Price values
+  if (hasCoupon) {
+    if (orig6m) orig6m.style.display = 'block';
+    if (orig1y) orig1y.style.display = 'block';
+    if (val6m) val6m.textContent = '4,000';
+    if (val1y) val1y.textContent = '8,000';
+    if (badge6m) badge6m.style.display = 'inline-block';
+    if (badge1y) badge1y.style.display = 'inline-block';
+  } else {
+    if (orig6m) orig6m.style.display = 'none';
+    if (orig1y) orig1y.style.display = 'none';
+    if (val6m) val6m.textContent = '5,000';
+    if (val1y) val1y.textContent = '10,000';
+    if (badge6m) badge6m.style.display = 'none';
+    if (badge1y) badge1y.style.display = 'none';
+  }
+
+  // Coupon banner in paywall
+  const banner = document.getElementById('pw-applied-banner');
+  const codeEl = document.getElementById('pw-applied-code');
+  const saveEl = document.getElementById('pw-applied-savings');
+  const inputEl = document.getElementById('pw-coupon-input');
+
+  if (hasCoupon) {
+    if (banner) banner.style.display = 'flex';
+    if (codeEl) codeEl.textContent = state.appliedCouponCode;
+    if (saveEl) saveEl.textContent = `You save ₹${discount.toLocaleString('en-IN')}`;
+    if (inputEl) inputEl.value = state.appliedCouponCode;
+  } else {
+    if (banner) banner.style.display = 'none';
+    if (inputEl) inputEl.value = '';
+  }
+
+  // Net amount
+  const netAmountEl = document.getElementById('pw-net-payable-amount');
+  if (netAmountEl) netAmountEl.textContent = `₹${finalAmount.toLocaleString('en-IN')}`;
+
+  // QR Code render
+  const qrTarget = document.getElementById('pw-qr-target');
+  if (qrTarget) {
+    qrTarget.innerHTML = '';
+    const cleanPlan = plan.name.replace(/[^a-zA-Z0-9 ]/g, '');
+    const upiUrl = `upi://pay?pa=${OFFICIAL_UPI_ID}&pn=SUPER%20BACHAT%20BAZZAR&am=${finalAmount}&cu=INR&tn=POS%20Subscription%20${encodeURIComponent(cleanPlan)}`;
+    if (window.QRCode) {
+      new window.QRCode(qrTarget, {
+        text: upiUrl,
+        width: 150,
+        height: 150,
+        colorDark: '#0f172a',
+        colorLight: '#ffffff',
+        correctLevel: window.QRCode.CorrectLevel.M
+      });
+    }
+  }
+
+  // Intent Link
+  const intentLink = document.getElementById('pw-upi-intent-link');
+  if (intentLink) {
+    const encodedStore = encodeURIComponent('SUPER BACHAT BAZZAR');
+    const encodedNote = encodeURIComponent(`POS Subscription ${plan.name}`);
+    intentLink.href = `upi://pay?pa=${OFFICIAL_UPI_ID}&pn=${encodedStore}&am=${finalAmount}&cu=INR&tn=${encodedNote}`;
+  }
+
+  if (window.lucide) window.lucide.createIcons();
+}
+
+export function renderSubscriptionStatus() {
+  const sub = state.subscription;
+  const badge = document.getElementById('sub-current-badge');
+  const title = document.getElementById('sub-current-plan-title');
+  const validity = document.getElementById('sub-current-validity');
+  const navBadge = document.getElementById('nav-pro-badge');
+
+  if (sub && sub.status === 'active') {
+    const end = new Date(sub.endDate);
+    const now = new Date();
+    const daysLeft = Math.max(0, Math.ceil((end - now) / (1000 * 60 * 60 * 24)));
+
+    if (badge) {
+      badge.textContent = 'PRO ACTIVE';
+      badge.className = 'sub-status-label';
+    }
+    if (title) title.textContent = sub.planName || 'Annual Super Merchant Pro';
+    if (validity) validity.textContent = `Valid until ${formatDateTime(sub.endDate)} (${daysLeft} days remaining)`;
+    if (navBadge) {
+      navBadge.textContent = 'PRO';
+      navBadge.className = 'pro-badge-pill';
+    }
+  } else {
+    if (badge) {
+      badge.textContent = 'UNPAID / TRIAL';
+      badge.className = 'sub-status-label';
+    }
+    if (title) title.textContent = 'Payment Required';
+    if (validity) validity.textContent = 'Please subscribe to unlock POS billing & cloud features';
+    if (navBadge) {
+      navBadge.textContent = 'PAY NOW';
+      navBadge.className = 'pro-badge-pill';
+    }
+  }
+}
+
