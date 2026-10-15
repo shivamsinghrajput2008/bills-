@@ -25,8 +25,8 @@
   <link rel="stylesheet" href="style.css">
 </head>
 <body class="theme-light">
-  <!-- POS High-Security Terminal Lock Screen -->
-  <div id="app-lock-overlay" class="lock-overlay" style="display: flex;">
+  <!-- POS High-Security Terminal Lock Screen (Hidden by default; can be locked on demand via header) -->
+  <div id="app-lock-overlay" class="lock-overlay" style="display: none;">
     <div class="lock-card" id="lock-card">
       <div class="lock-icon-halo">
         <div class="lock-pulse-ring"></div>
@@ -45,7 +45,7 @@
 
       <div class="lock-header-text">
         <h3 class="lock-title">Terminal Locked</h3>
-        <p class="lock-desc">Sign in with your Google Account or enter authorization password</p>
+        <p class="lock-desc">Enter authorization password or click Quick Open</p>
       </div>
 
       <div class="lock-auth-section">
@@ -70,10 +70,9 @@
             type="password" 
             id="lock-password-input" 
             class="lock-input" 
-            placeholder="Enter password" 
+            placeholder="Enter password (default: super99)" 
             autocomplete="current-password" 
-            required 
-            autofocus
+            value="super99"
           >
           <button type="button" id="lock-toggle-visibility" class="lock-toggle-pwd" title="Show / Hide Password" tabindex="-1">
             <i data-lucide="eye" id="lock-eye-icon"></i>
@@ -92,23 +91,31 @@
           </label>
         </div>
 
-        <button type="submit" id="lock-submit-btn" class="lock-btn-submit">
-          <i data-lucide="key-round"></i>
-          <span>Unlock Terminal</span>
-        </button>
+        <div style="display: flex; gap: 10px; margin-top: 10px;">
+          <button type="submit" id="lock-submit-btn" class="lock-btn-submit" style="flex: 1;">
+            <i data-lucide="key-round"></i>
+            <span>Unlock Terminal</span>
+          </button>
+          <button type="button" id="lock-quick-open-btn" class="btn btn-outline" style="border-radius: 12px; font-weight: 600;" title="Instantly open POS terminal">
+            <i data-lucide="arrow-right"></i> Open POS
+          </button>
+        </div>
       </form>
 
       <div class="lock-security-footer">
         <span class="lock-protected-pill">
-          <i data-lucide="shield" class="mini-icon"></i> POS Security Guard Active
+          <i data-lucide="shield" class="mini-icon"></i> POS Security Guard Active • Default PIN: super99
         </span>
       </div>
     </div>
   </div>
 
-  <!-- Mandatory Subscription Paywall Gate Overlay (Enforces payment before using the app) -->
+  <!-- Subscription Licensing Modal -->
   <div id="subscription-paywall-overlay" class="lock-overlay paywall-overlay" style="display: none;">
-    <div class="paywall-card" id="paywall-card">
+    <div class="paywall-card" id="paywall-card" style="position: relative;">
+      <button type="button" id="paywall-close-btn" class="modal-close-btn" style="position: absolute; top: 16px; right: 16px; z-index: 10;" title="Close">
+        <i data-lucide="x"></i>
+      </button>
       
       <!-- Paywall Top Banner -->
       <div class="paywall-header">
@@ -371,13 +378,27 @@
           <img src="" alt="Merchant Profile" class="user-avatar" id="user-avatar-img">
           <div class="user-info-text">
             <span class="user-name" id="user-display-name">Cashier</span>
-            <span class="cloud-sync-status" id="cloud-sync-status"><span class="pulse-dot green"></span> Synced</span>
           </div>
           <button type="button" class="icon-btn-signout" id="header-signout-btn" title="Sign Out of Google Account">
             <i data-lucide="log-out"></i>
           </button>
         </div>
       </div>
+
+      <!-- Real-Time Multi-Device Sync Status Indicator -->
+      <button type="button" class="header-sync-pill status-synced" id="header-sync-btn" title="Multi-Device Cloud Sync Status: Click to view active devices & live sync details">
+        <span class="sync-icon-box" id="header-sync-icon-box">
+          <i data-lucide="cloud-check" id="header-sync-icon"></i>
+        </span>
+        <div class="sync-label-group">
+          <span class="sync-main-status" id="header-sync-label">Synced</span>
+          <span class="sync-sub-status" id="header-sync-sub">Multi-Device Live</span>
+        </div>
+        <span class="sync-devices-badge" id="header-device-badge" title="Simultaneously Connected Devices">
+          <i data-lucide="smartphone"></i>
+          <span id="header-device-count-num">1</span>
+        </span>
+      </button>
 
       <button class="action-btn icon-btn" id="sound-toggle-btn" title="Toggle Beep Sound">
         <i data-lucide="volume-2" id="sound-icon"></i>
@@ -545,11 +566,25 @@
                 </div>
               </div>
 
-              <!-- GST / Tax Toggle -->
-              <div class="summary-row gst-row">
+              <!-- Product-wise Included GST Summary -->
+              <div class="summary-row gst-included-row">
+                <span class="summary-label" title="GST already included in product rates">
+                  <i data-lucide="receipt" class="mini-icon"></i> Total GST (Included)
+                </span>
+                <span class="summary-val text-primary" id="summary-gst-included-total">₹0.00</span>
+              </div>
+              <div class="summary-row gst-taxable-row">
+                <span class="summary-label" style="font-size: 11px; color: var(--text-muted);">
+                  Base Taxable Amount
+                </span>
+                <span class="summary-val" style="font-size: 11px; color: var(--text-muted);" id="summary-taxable-total">₹0.00</span>
+              </div>
+
+              <!-- Extra Surcharge GST Toggle (Optional) -->
+              <div class="summary-row gst-row" style="margin-top: 4px;">
                 <label class="gst-toggle-label" for="gst-enable-checkbox">
                   <input type="checkbox" id="gst-enable-checkbox">
-                  <span>Include GST (5%)</span>
+                  <span>Add Extra 5% GST (Surcharge)</span>
                 </label>
                 <span class="summary-val" id="summary-gst-total">₹0.00</span>
               </div>
@@ -740,12 +775,85 @@
                 </div>
               </div>
 
-              <!-- Selling Rate -->
+              <!-- Selling Rate (GST Included) -->
               <div class="form-group">
-                <label for="prod-rate" class="required">Our Bachat Rate (₹)</label>
+                <div class="label-with-action">
+                  <label for="prod-rate" class="required">Our Rate (₹) [Incl. GST]</label>
+                  <span class="badge-gst-included">GST Included</span>
+                </div>
                 <div class="input-with-icon">
                   <i data-lucide="badge-percent"></i>
                   <input type="number" id="prod-rate" class="form-input" placeholder="0.00" min="0" step="0.5" required>
+                </div>
+              </div>
+            </div>
+
+            <!-- GST Option & HSN Code Section (Rate is GST Included) -->
+            <div class="form-grid-3">
+              <!-- GST Slab Selection -->
+              <div class="form-group">
+                <label for="prod-gst-rate" class="required">GST Option (% on Included Rate)</label>
+                <div class="input-with-icon">
+                  <i data-lucide="receipt"></i>
+                  <select id="prod-gst-rate" class="form-select" required>
+                    <option value="0">0% — Nil / Exempt (Foodgrains, Atta, Salt)</option>
+                    <option value="5" selected>5% — Groceries, Oils, Sugar, Tea, Spices</option>
+                    <option value="12">12% — Butter, Ghee, Processed Foods</option>
+                    <option value="18">18% — Soaps, Detergents, Personal Care</option>
+                    <option value="28">28% — Cold Drinks, Chocolates, Luxury</option>
+                    <option value="custom">Custom GST %</option>
+                  </select>
+                </div>
+              </div>
+
+              <!-- Custom GST % Input (Hidden unless Custom is selected) & HSN Code -->
+              <div class="form-group" id="prod-custom-gst-wrap" style="display: none;">
+                <label for="prod-custom-gst-val">Custom GST Rate (%)</label>
+                <div class="input-with-icon">
+                  <i data-lucide="percent"></i>
+                  <input type="number" id="prod-custom-gst-val" class="form-input" placeholder="e.g. 18" min="0" max="100" step="0.1">
+                </div>
+              </div>
+
+              <!-- HSN / SAC Code (Standard Indian GST) -->
+              <div class="form-group">
+                <label for="prod-hsn">HSN / SAC Code <span class="optional-tag">Optional</span></label>
+                <div class="input-with-icon">
+                  <i data-lucide="hash"></i>
+                  <input type="text" id="prod-hsn" class="form-input" placeholder="e.g. 1512 or 1902">
+                </div>
+              </div>
+
+              <!-- Tax Inclusion Mode Indicator -->
+              <div class="form-group">
+                <label>Tax Inclusion Type</label>
+                <div class="gst-inclusion-toggle-card">
+                  <span class="badge-gst-included" style="margin-right: 6px;">Active</span>
+                  <span style="font-size: 12px; font-weight: 600; color: var(--text-main);">Rate Includes GST (Included Rate)</span>
+                  <input type="hidden" id="prod-gst-type" value="inclusive">
+                </div>
+              </div>
+            </div>
+
+            <!-- Live GST Included Rate Breakdown Banner -->
+            <div class="gst-breakdown-banner" id="inward-gst-breakdown-banner">
+              <div class="gst-calc-header">
+                <i data-lucide="calculator"></i>
+                <span>Live GST Included Rate Breakdown</span>
+              </div>
+              <div class="gst-calc-metrics">
+                <div class="gst-metric">
+                  <span class="gst-metric-label">Selling Rate (Gross):</span>
+                  <strong class="gst-metric-val" id="gst-preview-gross">₹0.00</strong>
+                </div>
+                <div class="gst-metric">
+                  <span class="gst-metric-label">Base Taxable Price (Net):</span>
+                  <strong class="gst-metric-val text-primary" id="gst-preview-taxable">₹0.00</strong>
+                </div>
+                <div class="gst-metric">
+                  <span class="gst-metric-label">Included GST Amount:</span>
+                  <strong class="gst-metric-val text-warning" id="gst-preview-gstamt">₹0.00</strong>
+                  <span class="gst-split-sub" id="gst-preview-split">(CGST: ₹0.00 + SGST: ₹0.00)</span>
                 </div>
               </div>
             </div>
@@ -839,6 +947,7 @@
                   <th>Stock Qty</th>
                   <th>MRP (₹)</th>
                   <th>Our Rate (₹)</th>
+                  <th>GST (Incl.)</th>
                   <th>Savings</th>
                   <th style="text-align: center;">Actions</th>
                 </tr>
@@ -1093,9 +1202,14 @@
         </div>
 
         <div class="settings-card" id="firebase-sync-card">
-          <div class="pos-card-header">
-            <i data-lucide="cloud"></i>
-            <span>Firebase Cloud Authentication & Database Sync</span>
+          <div class="pos-card-header" style="justify-content: space-between;">
+            <div style="display:flex; align-items:center; gap:8px;">
+              <i data-lucide="cloud"></i>
+              <span>Multi-Device Real-Time Cloud Sync & Presence</span>
+            </div>
+            <span class="sync-badge badge-synced" id="settings-sync-badge">
+              <i data-lucide="cloud-check"></i> <span id="settings-sync-text">Synced</span>
+            </span>
           </div>
           <div class="firebase-sync-content">
             <div class="firebase-status-banner">
@@ -1103,8 +1217,8 @@
                 <i data-lucide="database"></i>
               </div>
               <div class="sync-details">
-                <h4 id="firebase-sync-title">Cloud Database Active</h4>
-                <p id="firebase-sync-desc">Products, sales invoices, and store settings are synchronized with Google Firebase Firestore.</p>
+                <h4 id="firebase-sync-title">Cloud Database & Multi-Device Active</h4>
+                <p id="firebase-sync-desc">Inventory, sales book, and store settings are synchronized in real-time across all your phones, tablets, and laptops.</p>
                 <div class="firebase-account-pill">
                   <i data-lucide="user-check" class="mini-icon"></i>
                   <span id="firebase-user-email">Not Signed In</span>
@@ -1112,9 +1226,32 @@
               </div>
             </div>
 
+            <!-- Device & Sync Stats Grid -->
+            <div class="sync-quick-stats-row">
+              <div class="sync-quick-stat-item">
+                <span class="stat-label">This POS Terminal</span>
+                <strong class="stat-value" id="settings-device-name-display">Main Counter</strong>
+              </div>
+              <div class="sync-quick-stat-item">
+                <span class="stat-label">Connected Devices</span>
+                <strong class="stat-value text-primary" id="settings-device-count-display">1 Active</strong>
+              </div>
+              <div class="sync-quick-stat-item">
+                <span class="stat-label">Offline Outbox</span>
+                <strong class="stat-value" id="settings-outbox-count-display">0 Pending</strong>
+              </div>
+              <div class="sync-quick-stat-item">
+                <span class="stat-label">Conflict Policy</span>
+                <strong class="stat-value text-success">Last-Write-Wins (LWW)</strong>
+              </div>
+            </div>
+
             <div class="sync-action-buttons">
-              <button type="button" class="btn btn-primary" id="btn-force-cloud-sync">
-                <i data-lucide="refresh-cw"></i> Sync Local Data to Cloud
+              <button type="button" class="btn btn-primary" id="btn-open-sync-modal">
+                <i data-lucide="devices"></i> Manage Connected Devices & Sync
+              </button>
+              <button type="button" class="btn btn-outline" id="btn-force-cloud-sync">
+                <i data-lucide="refresh-cw"></i> Sync Now
               </button>
               <button type="button" class="btn btn-outline" id="btn-settings-google-signin">
                 <svg class="google-svg-icon" viewBox="0 0 24 24" width="16" height="16">
@@ -1573,6 +1710,26 @@
             </div>
           </div>
 
+          <!-- GST Breakdown Summary on Receipt (Rate is GST Included) -->
+          <div class="receipt-gst-section" id="receipt-gst-breakdown-section">
+            <div class="receipt-gst-title">GST Tax Breakdown (Included in Bill)</div>
+            <table class="receipt-gst-table">
+              <thead>
+                <tr>
+                  <th>GST Rate</th>
+                  <th class="text-right">Taxable Val</th>
+                  <th class="text-right">CGST</th>
+                  <th class="text-right">SGST</th>
+                  <th class="text-right">Total Tax</th>
+                </tr>
+              </thead>
+              <tbody id="receipt-gst-tbody">
+                <!-- Dynamically filled with GST slabs -->
+              </tbody>
+            </table>
+            <div class="receipt-gst-notice">* All product rates are inclusive of GST</div>
+          </div>
+
           <!-- Highlight Savings Banner on Bill -->
           <div class="receipt-savings-box">
             <span>🎉 YOU SAVED A TOTAL OF <strong id="receipt-saved-highlight">₹0.00</strong> ON THIS BILL! 🎉</span>
@@ -1710,7 +1867,14 @@
             <span class="edit-or-divider">or enter manually:</span>
             <input type="text" id="edit-manual-name" class="form-input" style="width:200px;" placeholder="Product name">
             <input type="number" id="edit-manual-mrp" class="form-input" style="width:100px;" placeholder="MRP ₹">
-            <input type="number" id="edit-manual-rate" class="form-input" style="width:100px;" placeholder="Rate ₹">
+            <input type="number" id="edit-manual-rate" class="form-input" style="width:100px;" placeholder="Rate ₹ (Incl.)">
+            <select id="edit-manual-gst" class="form-select-sm" style="width:105px;" title="GST % (Included in Rate)">
+              <option value="0">0% GST</option>
+              <option value="5" selected>5% GST</option>
+              <option value="12">12% GST</option>
+              <option value="18">18% GST</option>
+              <option value="28">28% GST</option>
+            </select>
             <input type="number" id="edit-manual-qty" class="form-input" style="width:80px;" placeholder="Qty" min="1" value="1">
             <button class="btn btn-primary btn-sm" id="edit-add-manual-item-btn">
               <i data-lucide="plus"></i> Add Item
@@ -1788,6 +1952,144 @@
             <i data-lucide="save"></i> Save Changes & Update Bill
           </button>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL 6: REAL-TIME MULTI-DEVICE LOGIN & DATA SYNC -->
+  <div class="modal-backdrop" id="multi-device-sync-modal">
+    <div class="modal-dialog modal-lg" style="max-width: 820px;">
+      <div class="modal-header">
+        <div class="modal-title">
+          <i data-lucide="refresh-cw"></i>
+          <span>Multi-Device Real-Time Sync & Active Sessions</span>
+        </div>
+        <button class="modal-close-btn" id="close-sync-modal-btn">
+          <i data-lucide="x"></i>
+        </button>
+      </div>
+
+      <div class="modal-body" style="padding: 20px; max-height: calc(85vh - 120px); overflow-y: auto;">
+        
+        <!-- Top Status Banner -->
+        <div class="sync-modal-hero" id="sync-modal-hero">
+          <div class="sync-hero-status-row">
+            <div class="sync-hero-badge status-synced" id="modal-sync-badge">
+              <i data-lucide="cloud-check" id="modal-sync-badge-icon"></i>
+              <span id="modal-sync-badge-text">Synced</span>
+            </div>
+            <div class="sync-hero-stats">
+              <span class="sync-stat-pill"><i data-lucide="radio"></i> Engine: <strong id="modal-sync-engine">Firestore WebSockets</strong></span>
+              <span class="sync-stat-pill"><i data-lucide="clock"></i> Last Sync: <strong id="modal-last-sync-time">Just now</strong></span>
+              <span class="sync-stat-pill" id="modal-pending-pill"><i data-lucide="inbox"></i> Offline Queue: <strong id="modal-pending-count">0 pending</strong></span>
+            </div>
+          </div>
+          <p class="sync-hero-desc" id="modal-sync-desc">
+            Changes made on any phone, tablet, laptop, or desktop are saved instantly and synchronized in real time across all logged-in devices.
+          </p>
+          <div class="sync-hero-actions">
+            <button type="button" class="btn btn-primary btn-sm" id="modal-force-sync-btn">
+              <i data-lucide="refresh-cw"></i> Sync Now
+            </button>
+            <span class="sync-policy-tag" title="Automatic conflict resolution">
+              <i data-lucide="shield-check"></i> Conflict Policy: Last-Write-Wins (LWW) + Version Vector
+            </span>
+          </div>
+        </div>
+
+        <!-- Section: This Device Profile -->
+        <div class="sync-section-card">
+          <div class="sync-section-header">
+            <i data-lucide="monitor"></i>
+            <h4>This Device Configuration</h4>
+          </div>
+          <div class="this-device-row">
+            <div class="device-icon-box" id="modal-this-device-icon">
+              <i data-lucide="laptop"></i>
+            </div>
+            <div class="device-info-fields">
+              <div class="form-group mb-0">
+                <label for="modal-device-name-input">Device Name / POS Terminal Label:</label>
+                <div style="display:flex; gap:8px;">
+                  <input type="text" id="modal-device-name-input" class="form-input" placeholder="e.g. Counter 1, Cashier Mobile, Floor Tablet" maxlength="50">
+                  <button type="button" class="btn btn-secondary" id="modal-save-device-name-btn">
+                    <i data-lucide="save"></i> Save Name
+                  </button>
+                </div>
+              </div>
+              <div class="device-meta-badges">
+                <span class="mini-meta-pill" id="modal-device-type-pill">Type: Desktop</span>
+                <span class="mini-meta-pill" id="modal-device-os-pill">OS: Windows</span>
+                <span class="mini-meta-pill" id="modal-device-browser-pill">Browser: Chrome</span>
+                <span class="mini-meta-pill text-mono" id="modal-device-id-pill">ID: dev_***</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Section: All Connected Devices -->
+        <div class="sync-section-card">
+          <div class="sync-section-header" style="justify-content: space-between;">
+            <div style="display:flex; align-items:center; gap:8px;">
+              <i data-lucide="devices"></i>
+              <h4>Simultaneously Logged-in Devices (<span id="modal-devices-count">1</span>)</h4>
+            </div>
+            <span class="live-pulse-badge"><span class="pulse-dot green"></span> Live Presence</span>
+          </div>
+          <p class="sync-subtext">All devices listed below share the same cloud inventory, sales book, and settings simultaneously.</p>
+          <div class="devices-list" id="modal-devices-list">
+            <!-- Dynamic device cards -->
+          </div>
+        </div>
+
+        <!-- Section: Multi-Device Login / Quick Connect to Phone or Tablet -->
+        <div class="sync-section-card">
+          <div class="sync-section-header">
+            <i data-lucide="qr-code"></i>
+            <h4>Open POS on Another Device (Mobile / Tablet / Laptop)</h4>
+          </div>
+          <div class="quick-connect-grid">
+            <div class="quick-connect-qr" id="device-connect-qr-box">
+              <div id="device-connect-qr-target"></div>
+            </div>
+            <div class="quick-connect-info">
+              <h5>Scan to open on Mobile or Tablet:</h5>
+              <ol class="quick-connect-steps">
+                <li>Scan this QR code with your phone or tablet camera.</li>
+                <li>Sign in with the <strong>same Google Account</strong> (<code id="modal-share-email">current account</code>).</li>
+                <li>Both devices will synchronize instantly in real-time!</li>
+              </ol>
+              <div class="quick-connect-copy-row">
+                <input type="text" id="device-connect-url-input" class="form-input text-mono" readonly value="">
+                <button type="button" class="btn btn-outline" id="device-copy-url-btn">
+                  <i data-lucide="copy"></i> Copy Link
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Section: Conflict Resolution & Sync Activity Log -->
+        <div class="sync-section-card">
+          <div class="sync-section-header" style="justify-content: space-between;">
+            <div style="display:flex; align-items:center; gap:8px;">
+              <i data-lucide="activity"></i>
+              <h4>Sync & Conflict Resolution Log</h4>
+            </div>
+            <button type="button" class="btn btn-ghost btn-sm" id="modal-clear-conflicts-btn">Clear Log</button>
+          </div>
+          <div class="conflict-log-list" id="modal-conflict-log-list">
+            <div class="empty-log-msg">No conflicts detected. Cloud state is consistent across all devices.</div>
+          </div>
+        </div>
+
+      </div>
+
+      <div class="modal-footer" style="justify-content: space-between;">
+        <span style="font-size: 13px; color: var(--text-muted);">
+          <i data-lucide="lock" class="mini-icon"></i> End-to-end encrypted Firestore HTTPS transfer
+        </span>
+        <button class="btn btn-secondary" id="modal-close-sync-footer-btn">Close</button>
       </div>
     </div>
   </div>

@@ -57,10 +57,33 @@
           "description": "Shelf or rack location in store",
           "maxLength": 60
         },
+        "gstRate": {
+          "type": "number",
+          "description": "GST rate percentage"
+        },
+        "gstType": {
+          "type": "string",
+          "description": "GST type e.g. inclusive",
+          "maxLength": 30
+        },
+        "hsn": {
+          "type": "string",
+          "description": "HSN code",
+          "maxLength": 30
+        },
         "ownerId": {
           "type": "string",
           "description": "Firebase Auth UID of the store merchant",
           "maxLength": 128
+        },
+        "version": {
+          "type": "number",
+          "description": "Incremental version number for conflict resolution"
+        },
+        "lastModifiedByDevice": {
+          "type": "string",
+          "description": "Device ID or name that performed the update",
+          "maxLength": 100
         },
         "updatedAt": {
           "type": "string",
@@ -131,9 +154,23 @@
           "description": "Firebase Auth UID of the cashier/store owner",
           "maxLength": 128
         },
+        "version": {
+          "type": "number",
+          "description": "Incremental version number for conflict resolution"
+        },
+        "lastModifiedByDevice": {
+          "type": "string",
+          "description": "Device ID or name that performed the update",
+          "maxLength": 100
+        },
         "createdAt": {
           "type": "string",
           "description": "Creation timestamp",
+          "maxLength": 50
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "Last modification timestamp",
           "maxLength": 50
         }
       },
@@ -173,6 +210,15 @@
           "type": "string",
           "description": "Firebase Auth UID of the store owner",
           "maxLength": 128
+        },
+        "version": {
+          "type": "number",
+          "description": "Version counter for conflict resolution"
+        },
+        "lastModifiedByDevice": {
+          "type": "string",
+          "description": "Device ID or name that updated settings",
+          "maxLength": 100
         },
         "updatedAt": {
           "type": "string",
@@ -257,6 +303,59 @@
         }
       },
       "required": ["id", "planId", "finalAmount", "status", "ownerId"]
+    },
+    "Device": {
+      "title": "Device",
+      "description": "Registered active merchant device session for multi-device sync",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique device identifier",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "deviceName": {
+          "type": "string",
+          "description": "Customizable device label e.g. Counter 1, Mobile",
+          "maxLength": 100
+        },
+        "deviceType": {
+          "type": "string",
+          "description": "desktop, laptop, tablet, mobile",
+          "maxLength": 30
+        },
+        "browser": {
+          "type": "string",
+          "description": "Browser name and version",
+          "maxLength": 100
+        },
+        "os": {
+          "type": "string",
+          "description": "Operating system name",
+          "maxLength": 100
+        },
+        "online": {
+          "type": "boolean",
+          "description": "Current connection state of device"
+        },
+        "lastActive": {
+          "type": "string",
+          "description": "ISO timestamp of last activity heartbeat",
+          "maxLength": 50
+        },
+        "ownerId": {
+          "type": "string",
+          "description": "Firebase Auth UID of merchant",
+          "maxLength": 128
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "Last update ISO timestamp",
+          "maxLength": 50
+        }
+      },
+      "required": ["id", "deviceName", "ownerId"]
     }
   },
   "firestore": {
@@ -275,6 +374,10 @@
     "/users/{userId}/subscriptions/{subscriptionId}": {
       "schema": "Subscription",
       "description": "Merchant POS subscription records and validity"
+    },
+    "/users/{userId}/devices/{deviceId}": {
+      "schema": "Device",
+      "description": "Connected devices and active sessions for multi-device sync"
     }
   }
 }

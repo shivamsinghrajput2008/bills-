@@ -54,6 +54,12 @@ service cloud.firestore {
         && data.status is string && data.status.size() <= 30;
     }
 
+    function isValidDevice(data) {
+      return data.id is string && data.id.size() <= 128
+        && data.deviceName is string && data.deviceName.size() > 0 && data.deviceName.size() <= 100
+        && data.ownerId is string && data.ownerId == request.auth.uid;
+    }
+
     match /users/{userId} {
       allow read, write: if isUserOwner(userId);
 
@@ -109,6 +115,20 @@ service cloud.firestore {
           && incoming().id == existing().id
           && incoming().ownerId == existing().ownerId;
         allow delete: if isUserOwner(userId) && isValidId(subscriptionId);
+      }
+
+      match /devices/{deviceId} {
+        allow read: if isUserOwner(userId);
+        allow create: if isUserOwner(userId)
+          && isValidId(deviceId)
+          && isValidDevice(incoming())
+          && incoming().id == deviceId;
+        allow update: if isUserOwner(userId)
+          && isValidId(deviceId)
+          && isValidDevice(incoming())
+          && incoming().id == existing().id
+          && incoming().ownerId == existing().ownerId;
+        allow delete: if isUserOwner(userId) && isValidId(deviceId);
       }
     }
   }

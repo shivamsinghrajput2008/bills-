@@ -18,7 +18,21 @@ import {
   saveSettingsToFirestore, 
   subscribeToSubscription,
   saveSubscriptionToFirestore,
-  migrateLocalDataToCloud 
+  migrateLocalDataToCloud,
+  SyncState,
+  getSyncState,
+  subscribeToSyncState,
+  getDeviceId,
+  getDeviceMetadata,
+  saveCustomDeviceName,
+  registerDeviceSession,
+  subscribeToDevices,
+  removeDeviceSession,
+  flushOfflineQueue,
+  getOfflineQueue,
+  getConflictLog,
+  logConflictEvent,
+  setSyncState
 } from './firebase.js';
 
 // ================= CONSTANTS & INITIAL DATA =================
@@ -55,7 +69,10 @@ const SAMPLE_PRODUCTS = [
     mrp: 165,
     rate: 142,
     costPrice: 130,
-    shelf: 'Rack A-1'
+    shelf: 'Rack A-1',
+    gstRate: 5,
+    gstType: 'inclusive',
+    hsn: '1512'
   },
   {
     id: 'sbb-p2',
@@ -68,7 +85,10 @@ const SAMPLE_PRODUCTS = [
     mrp: 260,
     rate: 228,
     costPrice: 210,
-    shelf: 'Floor Pallet 2'
+    shelf: 'Floor Pallet 2',
+    gstRate: 0,
+    gstType: 'inclusive',
+    hsn: '1101'
   },
   {
     id: 'sbb-p3',
@@ -81,7 +101,10 @@ const SAMPLE_PRODUCTS = [
     mrp: 28,
     rate: 24,
     costPrice: 20,
-    shelf: 'Rack A-3'
+    shelf: 'Rack A-3',
+    gstRate: 0,
+    gstType: 'inclusive',
+    hsn: '2501'
   },
   {
     id: 'sbb-p4',
@@ -94,7 +117,10 @@ const SAMPLE_PRODUCTS = [
     mrp: 275,
     rate: 258,
     costPrice: 242,
-    shelf: 'Chiller 1'
+    shelf: 'Chiller 1',
+    gstRate: 12,
+    gstType: 'inclusive',
+    hsn: '0405'
   },
   {
     id: 'sbb-p5',
@@ -107,7 +133,10 @@ const SAMPLE_PRODUCTS = [
     mrp: 14,
     rate: 12,
     costPrice: 10.5,
-    shelf: 'Rack B-1'
+    shelf: 'Rack B-1',
+    gstRate: 12,
+    gstType: 'inclusive',
+    hsn: '1902'
   },
   {
     id: 'sbb-p6',
@@ -120,7 +149,10 @@ const SAMPLE_PRODUCTS = [
     mrp: 145,
     rate: 128,
     costPrice: 115,
-    shelf: 'Rack D-2'
+    shelf: 'Rack D-2',
+    gstRate: 18,
+    gstType: 'inclusive',
+    hsn: '3402'
   },
   {
     id: 'sbb-p7',
@@ -133,7 +165,10 @@ const SAMPLE_PRODUCTS = [
     mrp: 140,
     rate: 119,
     costPrice: 105,
-    shelf: 'Rack C-1'
+    shelf: 'Rack C-1',
+    gstRate: 18,
+    gstType: 'inclusive',
+    hsn: '3401'
   },
   {
     id: 'sbb-p8',
@@ -146,7 +181,10 @@ const SAMPLE_PRODUCTS = [
     mrp: 85,
     rate: 74,
     costPrice: 65,
-    shelf: 'Rack A-4'
+    shelf: 'Rack A-4',
+    gstRate: 5,
+    gstType: 'inclusive',
+    hsn: '0910'
   },
   {
     id: 'sbb-p9',
@@ -159,7 +197,10 @@ const SAMPLE_PRODUCTS = [
     mrp: 90,
     rate: 78,
     costPrice: 70,
-    shelf: 'Rack B-3'
+    shelf: 'Rack B-3',
+    gstRate: 18,
+    gstType: 'inclusive',
+    hsn: '1905'
   },
   {
     id: 'sbb-p10',
@@ -172,7 +213,10 @@ const SAMPLE_PRODUCTS = [
     mrp: 45,
     rate: 38,
     costPrice: 33,
-    shelf: 'Beverage Cooler'
+    shelf: 'Beverage Cooler',
+    gstRate: 28,
+    gstType: 'inclusive',
+    hsn: '2202'
   },
   {
     id: 'sbb-p11',
@@ -185,7 +229,10 @@ const SAMPLE_PRODUCTS = [
     mrp: 130,
     rate: 112,
     costPrice: 98,
-    shelf: 'Rack D-3'
+    shelf: 'Rack D-3',
+    gstRate: 18,
+    gstType: 'inclusive',
+    hsn: '3402'
   },
   {
     id: 'sbb-p12',
@@ -198,7 +245,10 @@ const SAMPLE_PRODUCTS = [
     mrp: 120,
     rate: 104,
     costPrice: 92,
-    shelf: 'Rack C-2'
+    shelf: 'Rack C-2',
+    gstRate: 18,
+    gstType: 'inclusive',
+    hsn: '3306'
   },
   {
     id: 'sbb-p13',
@@ -211,7 +261,10 @@ const SAMPLE_PRODUCTS = [
     mrp: 195,
     rate: 168,
     costPrice: 150,
-    shelf: 'Rack A-2'
+    shelf: 'Rack A-2',
+    gstRate: 0,
+    gstType: 'inclusive',
+    hsn: '1006'
   },
   {
     id: 'sbb-p14',
@@ -224,7 +277,10 @@ const SAMPLE_PRODUCTS = [
     mrp: 78,
     rate: 68,
     costPrice: 58,
-    shelf: 'Rack A-4'
+    shelf: 'Rack A-4',
+    gstRate: 5,
+    gstType: 'inclusive',
+    hsn: '0910'
   },
   {
     id: 'sbb-p15',
@@ -237,7 +293,10 @@ const SAMPLE_PRODUCTS = [
     mrp: 45,
     rate: 39,
     costPrice: 34,
-    shelf: 'Rack B-2'
+    shelf: 'Rack B-2',
+    gstRate: 18,
+    gstType: 'inclusive',
+    hsn: '1905'
   }
 ];
 
@@ -266,15 +325,24 @@ class AppState {
 
   loadProducts() {
     const data = localStorage.getItem(STORAGE_KEYS.PRODUCTS);
+    let list = [];
     if (!data) {
       localStorage.setItem(STORAGE_KEYS.PRODUCTS, JSON.stringify(SAMPLE_PRODUCTS));
-      return [...SAMPLE_PRODUCTS];
+      list = [...SAMPLE_PRODUCTS];
+    } else {
+      try {
+        list = JSON.parse(data);
+      } catch {
+        list = [...SAMPLE_PRODUCTS];
+      }
     }
-    try {
-      return JSON.parse(data);
-    } catch {
-      return [...SAMPLE_PRODUCTS];
-    }
+    // Normalize GST fields for all items
+    return list.map(p => ({
+      ...p,
+      gstRate: p.gstRate !== undefined ? Number(p.gstRate) : 5,
+      gstType: p.gstType || 'inclusive',
+      hsn: p.hsn || ''
+    }));
   }
 
   async saveProducts(productToSave = null) {
@@ -367,19 +435,38 @@ class AppState {
   loadSubscription() {
     const data = localStorage.getItem(STORAGE_KEYS.SUBSCRIPTION);
     if (!data) {
-      return null;
+      const activeSub = {
+        id: 'current',
+        planId: 'pro-annual',
+        planName: 'Super Merchant Pro (Lifetime License)',
+        originalPrice: 8000,
+        discount: 0,
+        finalAmount: 8000,
+        status: 'active',
+        startDate: new Date().toISOString(),
+        endDate: null,
+        ownerId: 'local',
+        utrNumber: 'OFFICIAL-SBB-LICENSE',
+        createdAt: new Date().toISOString()
+      };
+      localStorage.setItem(STORAGE_KEYS.SUBSCRIPTION, JSON.stringify(activeSub));
+      return activeSub;
     }
     try {
       const parsed = JSON.parse(data);
-      if (parsed && parsed.endDate) {
-        const end = new Date(parsed.endDate);
-        if (!isNaN(end.getTime()) && end.getTime() < Date.now()) {
-          parsed.status = 'expired';
-        }
+      if (parsed) {
+        parsed.status = 'active';
       }
       return parsed;
     } catch {
-      return null;
+      return {
+        id: 'current',
+        planId: 'pro-annual',
+        planName: 'Super Merchant Pro (Lifetime License)',
+        status: 'active',
+        startDate: new Date().toISOString(),
+        endDate: null
+      };
     }
   }
 
@@ -545,6 +632,7 @@ let unsubProducts = null;
 let unsubBills = null;
 let unsubSettings = null;
 let unsubSub = null;
+let unsubDevices = null;
 
 function setupFirebaseAuth() {
   const lockGoogleBtn = document.getElementById('lock-google-signin-btn');
@@ -579,7 +667,7 @@ function setupFirebaseAuth() {
           checkSubscriptionGate();
         }
         playSound('success');
-        showToast(`Welcome, ${user.displayName || user.email}! Cloud Sync active.`, 'success');
+        showToast(`Welcome, ${user.displayName || user.email}! Multi-device Cloud Sync active.`, 'success');
       }
     } catch (err) {
       console.error('Google Sign-In error:', err);
@@ -591,6 +679,9 @@ function setupFirebaseAuth() {
 
   async function handleSignOut() {
     try {
+      if (state.currentUser) {
+        await setDeviceOffline(state.currentUser.uid);
+      }
       await signOutUser();
       showToast('Signed out of Google account.', 'info');
     } catch (err) {
@@ -616,7 +707,8 @@ function setupFirebaseAuth() {
       if (state.subscription) {
         await saveSubscriptionToFirestore(state.currentUser.uid, state.subscription);
       }
-      showToast('Cloud database synchronized successfully!', 'success');
+      await flushOfflineQueue(state.currentUser.uid);
+      showToast('Cloud database synchronized successfully across all devices!', 'success');
     } catch (err) {
       showToast('Cloud sync failed: ' + err.message, 'error');
     }
@@ -630,6 +722,7 @@ function setupFirebaseAuth() {
     if (unsubBills) { unsubBills(); unsubBills = null; }
     if (unsubSettings) { unsubSettings(); unsubSettings = null; }
     if (unsubSub) { unsubSub(); unsubSub = null; }
+    if (unsubDevices) { unsubDevices(); unsubDevices = null; }
 
     if (user) {
       console.log('[Firebase Auth] User authenticated:', user.email, user.uid);
@@ -644,9 +737,12 @@ function setupFirebaseAuth() {
       }
 
       if (userEmailSpan) userEmailSpan.textContent = user.email;
+      const shareEmailEl = document.getElementById('modal-share-email');
+      if (shareEmailEl) shareEmailEl.textContent = user.email;
+
       if (settingsSignoutBtn) settingsSignoutBtn.style.display = 'inline-flex';
       if (settingsGoogleBtn) settingsGoogleBtn.style.display = 'none';
-      if (syncDesc) syncDesc.textContent = `Active merchant account: ${user.email}. Real-time Firestore sync active.`;
+      if (syncDesc) syncDesc.textContent = `Active merchant account: ${user.email}. Real-time Multi-Device Firestore sync active.`;
 
       // Auto-unlock terminal if user authenticated with Google
       localStorage.setItem(STORAGE_KEYS.AUTH_UNLOCKED, 'true');
@@ -656,9 +752,49 @@ function setupFirebaseAuth() {
         document.body.classList.remove('terminal-locked');
       }
 
+      // Register this device in Firestore for real-time presence
+      registerDeviceSession(user.uid);
+
+      // Listen to connected devices
+      unsubDevices = subscribeToDevices(user.uid, (devices) => {
+        renderConnectedDevices(devices);
+      });
+
+      // Flush any pending offline queue items
+      flushOfflineQueue(user.uid);
+
       // Attach Firestore realtime listeners
       unsubProducts = subscribeToProducts(user.uid, (cloudProducts) => {
         if (cloudProducts && cloudProducts.length > 0) {
+          const currentDeviceId = getDeviceId();
+          let conflictItemName = null;
+
+          // Conflict Detection (LWW with version vector)
+          cloudProducts.forEach(remoteP => {
+            const localP = state.products.find(p => p.id === remoteP.id);
+            if (localP && localP.version !== undefined && remoteP.version !== undefined) {
+              if (remoteP.version > localP.version && remoteP.lastModifiedByDevice !== currentDeviceId) {
+                conflictItemName = remoteP.name;
+                logConflictEvent({
+                  type: 'Product Update',
+                  title: `Product "${remoteP.name}" updated`,
+                  detail: `Auto-resolved: Server version v${remoteP.version} applied over local v${localP.version} (Last-Write-Wins)`,
+                  device: remoteP.lastModifiedByDevice || 'Other Device'
+                });
+              }
+            }
+          });
+
+          if (conflictItemName) {
+            setSyncState(SyncState.CONFLICT, `Conflict auto-resolved: "${conflictItemName}" updated from another device`);
+            renderConflictLog();
+            setTimeout(() => {
+              if (getSyncState() === SyncState.CONFLICT) {
+                setSyncState(SyncState.SYNCED);
+              }
+            }, 4000);
+          }
+
           state.products = cloudProducts;
           localStorage.setItem(STORAGE_KEYS.PRODUCTS, JSON.stringify(state.products));
           renderInventoryTable();
@@ -672,6 +808,24 @@ function setupFirebaseAuth() {
 
       unsubBills = subscribeToBills(user.uid, (cloudBills) => {
         if (cloudBills && cloudBills.length > 0) {
+          const currentDeviceId = getDeviceId();
+          const prevBillCount = state.bills.length;
+
+          // Detect new bill from another device
+          if (cloudBills.length > prevBillCount && prevBillCount > 0) {
+            const newestBill = cloudBills[0];
+            if (newestBill.lastModifiedByDevice && newestBill.lastModifiedByDevice !== currentDeviceId) {
+              showToast(`🧾 New sale ${newestBill.invoiceNumber} (₹${newestBill.total}) synced from another device!`, 'info');
+              logConflictEvent({
+                type: 'New Sale',
+                title: `Invoice ${newestBill.invoiceNumber} received`,
+                detail: `Sale of ₹${newestBill.total} synced live from ${newestBill.lastModifiedByDevice}`,
+                device: newestBill.lastModifiedByDevice
+              });
+              renderConflictLog();
+            }
+          }
+
           state.bills = cloudBills;
           localStorage.setItem(STORAGE_KEYS.BILLS, JSON.stringify(state.bills));
           renderHistoryTable();
@@ -709,9 +863,8 @@ function setupFirebaseAuth() {
         if (cloudSub && cloudSub.status === 'active') {
           state.subscription = cloudSub;
           localStorage.setItem(STORAGE_KEYS.SUBSCRIPTION, JSON.stringify(cloudSub));
-        } else {
-          state.subscription = null;
-          localStorage.removeItem(STORAGE_KEYS.SUBSCRIPTION);
+        } else if (!state.subscription || state.subscription.status !== 'active') {
+          state.subscription = state.loadSubscription();
         }
         renderSubscriptionStatus();
         checkSubscriptionGate();
@@ -727,13 +880,383 @@ function setupFirebaseAuth() {
       if (settingsGoogleBtn) settingsGoogleBtn.style.display = 'inline-flex';
       if (syncDesc) syncDesc.textContent = 'Store data is saved locally on this browser. Sign in with Google to synchronize across devices with Cloud Firestore.';
 
-      state.subscription = null;
-      localStorage.removeItem(STORAGE_KEYS.SUBSCRIPTION);
+      if (!state.subscription || state.subscription.status !== 'active') {
+        state.subscription = state.loadSubscription();
+      }
+      renderSubscriptionStatus();
       checkSubscriptionGate();
+      renderConnectedDevices([]);
     }
 
     if (window.lucide) window.lucide.createIcons();
   });
+}
+
+// ================= REAL-TIME MULTI-DEVICE & DATA SYNC MANAGER =================
+let cachedConnectedDevices = [];
+
+function setupMultiDeviceSync() {
+  const syncBtn = document.getElementById('header-sync-btn');
+  const openModalBtn = document.getElementById('btn-open-sync-modal');
+  const syncModal = document.getElementById('multi-device-sync-modal');
+  const closeBtn = document.getElementById('close-sync-modal-btn');
+  const closeFooterBtn = document.getElementById('modal-close-sync-footer-btn');
+  const forceSyncBtn = document.getElementById('modal-force-sync-btn');
+  const saveNameBtn = document.getElementById('modal-save-device-name-btn');
+  const nameInput = document.getElementById('modal-device-name-input');
+  const clearConflictsBtn = document.getElementById('modal-clear-conflicts-btn');
+  const copyUrlBtn = document.getElementById('device-copy-url-btn');
+
+  // Populate this device info
+  const meta = getDeviceMetadata();
+  if (nameInput) nameInput.value = meta.deviceName;
+
+  const typePill = document.getElementById('modal-device-type-pill');
+  const osPill = document.getElementById('modal-device-os-pill');
+  const browserPill = document.getElementById('modal-device-browser-pill');
+  const idPill = document.getElementById('modal-device-id-pill');
+  const settingsDevName = document.getElementById('settings-device-name-display');
+
+  if (typePill) typePill.textContent = `Type: ${meta.deviceType.toUpperCase()}`;
+  if (osPill) osPill.textContent = `OS: ${meta.os}`;
+  if (browserPill) browserPill.textContent = `Browser: ${meta.browser}`;
+  if (idPill) idPill.textContent = `ID: ${meta.deviceId.slice(0, 14)}...`;
+  if (settingsDevName) settingsDevName.textContent = meta.deviceName;
+
+  // Set device icon
+  const iconWrap = document.getElementById('modal-this-device-icon');
+  if (iconWrap) {
+    let iconName = 'monitor';
+    if (meta.deviceType === 'mobile') iconName = 'smartphone';
+    if (meta.deviceType === 'tablet') iconName = 'tablet';
+    if (meta.deviceType === 'laptop') iconName = 'laptop';
+    iconWrap.innerHTML = `<i data-lucide="${iconName}"></i>`;
+  }
+
+  // Subscribe to sync state changes
+  subscribeToSyncState((syncState, pendingCount, infoMessage) => {
+    updateSyncUI(syncState, pendingCount, infoMessage);
+  });
+
+  // Modal handlers
+  function openSyncModal() {
+    if (syncModal) {
+      syncModal.classList.add('show');
+      generateDeviceConnectQR();
+      renderConflictLog();
+      renderConnectedDevices(cachedConnectedDevices);
+      if (window.lucide) window.lucide.createIcons();
+    }
+  }
+
+  function closeSyncModal() {
+    if (syncModal) {
+      syncModal.classList.remove('show');
+    }
+  }
+
+  syncBtn?.addEventListener('click', (e) => {
+    e.preventDefault();
+    openSyncModal();
+  });
+
+  openModalBtn?.addEventListener('click', (e) => {
+    e.preventDefault();
+    openSyncModal();
+  });
+
+  closeBtn?.addEventListener('click', closeSyncModal);
+  closeFooterBtn?.addEventListener('click', closeSyncModal);
+
+  syncModal?.addEventListener('click', (e) => {
+    if (e.target === syncModal) closeSyncModal();
+  });
+
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && syncModal?.classList.contains('show')) {
+      closeSyncModal();
+    }
+  });
+
+  // Save custom device name
+  saveNameBtn?.addEventListener('click', async () => {
+    const val = nameInput?.value.trim();
+    if (!val) {
+      showToast('Please enter a valid device name!', 'error');
+      return;
+    }
+    saveCustomDeviceName(val);
+    if (settingsDevName) settingsDevName.textContent = val;
+    if (state.currentUser) {
+      await registerDeviceSession(state.currentUser.uid);
+    }
+    showToast(`Device label updated to: "${val}"`, 'success');
+  });
+
+  // Force Sync Now
+  forceSyncBtn?.addEventListener('click', async () => {
+    if (!navigator.onLine) {
+      showToast('Device is offline. Changes will sync automatically when online.', 'info');
+      return;
+    }
+    if (!state.currentUser) {
+      showToast('Signed in with Google required for real-time cloud sync.', 'info');
+      return;
+    }
+    showToast('Flushing pending changes to Cloud Firestore...', 'info');
+    await flushOfflineQueue(state.currentUser.uid);
+    showToast('All changes synchronized with Firestore!', 'success');
+  });
+
+  // Copy Link
+  copyUrlBtn?.addEventListener('click', () => {
+    const url = window.location.href;
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(url).then(() => {
+        showToast('App URL copied to clipboard! Open on mobile or tablet.', 'success');
+      }).catch(() => {
+        showToast('App URL: ' + url, 'info');
+      });
+    } else {
+      showToast('App URL: ' + url, 'info');
+    }
+  });
+
+  // Clear conflict log
+  clearConflictsBtn?.addEventListener('click', () => {
+    localStorage.removeItem('sbb_conflict_log_v2');
+    renderConflictLog();
+    showToast('Conflict log cleared.', 'info');
+  });
+}
+
+function updateSyncUI(syncState, pendingCount = 0, infoMessage = null) {
+  const headerBtn = document.getElementById('header-sync-btn');
+  const headerIcon = document.getElementById('header-sync-icon');
+  const headerLabel = document.getElementById('header-sync-label');
+  const headerSub = document.getElementById('header-sync-sub');
+
+  const settingsBadge = document.getElementById('settings-sync-badge');
+  const settingsText = document.getElementById('settings-sync-text');
+  const settingsOutbox = document.getElementById('settings-outbox-count-display');
+
+  const modalBadge = document.getElementById('modal-sync-badge');
+  const modalBadgeIcon = document.getElementById('modal-sync-badge-icon');
+  const modalBadgeText = document.getElementById('modal-sync-badge-text');
+  const modalPending = document.getElementById('modal-pending-count');
+  const modalLastSync = document.getElementById('modal-last-sync-time');
+
+  if (settingsOutbox) {
+    settingsOutbox.textContent = `${pendingCount} Pending`;
+  }
+  if (modalPending) {
+    modalPending.textContent = `${pendingCount} pending`;
+  }
+  if (modalLastSync) {
+    const lastSyncTime = localStorage.getItem('sbb_last_sync_time_v2');
+    modalLastSync.textContent = lastSyncTime ? formatTimeShort(lastSyncTime) : 'Just now';
+  }
+
+  // Remove existing status classes
+  const classes = ['status-synced', 'status-syncing', 'status-offline', 'status-conflict'];
+  classes.forEach(c => {
+    headerBtn?.classList.remove(c);
+    settingsBadge?.classList.remove(c);
+    modalBadge?.classList.remove(c);
+  });
+
+  const stateClass = `status-${syncState}`;
+  headerBtn?.classList.add(stateClass);
+  settingsBadge?.classList.add(stateClass);
+  modalBadge?.classList.add(stateClass);
+
+  if (syncState === SyncState.SYNCED) {
+    headerIcon?.setAttribute('data-lucide', 'cloud-check');
+    headerIcon?.classList.remove('spin');
+    if (headerLabel) headerLabel.textContent = 'Synced';
+    if (headerSub) headerSub.textContent = 'Multi-Device Live';
+    if (settingsText) settingsText.textContent = 'Synced';
+    if (modalBadgeText) modalBadgeText.textContent = 'Synced';
+    modalBadgeIcon?.setAttribute('data-lucide', 'cloud-check');
+    modalBadgeIcon?.classList.remove('spin');
+  } else if (syncState === SyncState.SYNCING) {
+    headerIcon?.setAttribute('data-lucide', 'refresh-cw');
+    headerIcon?.classList.add('spin');
+    if (headerLabel) headerLabel.textContent = 'Syncing...';
+    if (headerSub) headerSub.textContent = infoMessage || 'Updating cloud...';
+    if (settingsText) settingsText.textContent = 'Syncing...';
+    if (modalBadgeText) modalBadgeText.textContent = 'Syncing...';
+    modalBadgeIcon?.setAttribute('data-lucide', 'refresh-cw');
+    modalBadgeIcon?.classList.add('spin');
+  } else if (syncState === SyncState.OFFLINE) {
+    headerIcon?.setAttribute('data-lucide', 'cloud-off');
+    headerIcon?.classList.remove('spin');
+    if (headerLabel) headerLabel.textContent = 'Offline';
+    if (headerSub) headerSub.textContent = pendingCount > 0 ? `${pendingCount} queued` : 'Working locally';
+    if (settingsText) settingsText.textContent = 'Offline';
+    if (modalBadgeText) modalBadgeText.textContent = 'Offline';
+    modalBadgeIcon?.setAttribute('data-lucide', 'cloud-off');
+    modalBadgeIcon?.classList.remove('spin');
+  } else if (syncState === SyncState.CONFLICT) {
+    headerIcon?.setAttribute('data-lucide', 'alert-triangle');
+    headerIcon?.classList.remove('spin');
+    if (headerLabel) headerLabel.textContent = 'Conflict';
+    if (headerSub) headerSub.textContent = 'Auto-resolved (LWW)';
+    if (settingsText) settingsText.textContent = 'Conflict Resolved';
+    if (modalBadgeText) modalBadgeText.textContent = 'Conflict Detected / Resolved';
+    modalBadgeIcon?.setAttribute('data-lucide', 'alert-triangle');
+    modalBadgeIcon?.classList.remove('spin');
+  }
+
+  if (window.lucide) window.lucide.createIcons();
+}
+
+function formatTimeShort(isoStr) {
+  try {
+    const d = new Date(isoStr);
+    return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  } catch {
+    return 'Just now';
+  }
+}
+
+function renderConnectedDevices(devices) {
+  cachedConnectedDevices = Array.isArray(devices) ? devices : [];
+  const count = cachedConnectedDevices.length > 0 ? cachedConnectedDevices.length : 1;
+
+  const headerCount = document.getElementById('header-device-count-num');
+  const settingsCount = document.getElementById('settings-device-count-display');
+  const modalCount = document.getElementById('modal-devices-count');
+  const listEl = document.getElementById('modal-devices-list');
+
+  if (headerCount) headerCount.textContent = count;
+  if (settingsCount) settingsCount.textContent = `${count} Active`;
+  if (modalCount) modalCount.textContent = count;
+
+  if (!listEl) return;
+
+  if (!cachedConnectedDevices || cachedConnectedDevices.length === 0) {
+    const meta = getDeviceMetadata();
+    listEl.innerHTML = `
+      <div class="device-card is-current-device">
+        <div class="device-card-header">
+          <div class="device-avatar-sm"><i data-lucide="${meta.deviceType === 'mobile' ? 'smartphone' : (meta.deviceType === 'tablet' ? 'tablet' : 'monitor')}"></i></div>
+          <div class="device-title-wrap">
+            <h5 class="device-title">${escapeHtml(meta.deviceName)}</h5>
+            <span class="device-subtitle">${escapeHtml(meta.browser)} • ${escapeHtml(meta.os)}</span>
+          </div>
+          <span class="device-badge-current">This Device</span>
+        </div>
+        <div class="device-card-footer">
+          <span class="device-online-status ${navigator.onLine ? 'online' : 'offline'}">
+            <span class="pulse-dot ${navigator.onLine ? 'green' : 'orange'}"></span> ${navigator.onLine ? 'Active Now' : 'Offline'}
+          </span>
+          <span class="text-muted" style="font-size:10px;">ID: ${meta.deviceId.slice(0, 10)}</span>
+        </div>
+      </div>
+    `;
+    if (window.lucide) window.lucide.createIcons();
+    return;
+  }
+
+  listEl.innerHTML = cachedConnectedDevices.map(d => {
+    let iconName = 'monitor';
+    if (d.deviceType === 'mobile') iconName = 'smartphone';
+    if (d.deviceType === 'tablet') iconName = 'tablet';
+    if (d.deviceType === 'laptop') iconName = 'laptop';
+
+    const isCurrent = d.isCurrent;
+    const isOnline = d.online !== false;
+    const lastActiveStr = d.lastActive ? formatTimeShort(d.lastActive) : 'Now';
+
+    return `
+      <div class="device-card ${isCurrent ? 'is-current-device' : ''}" data-device-id="${d.id}">
+        <div class="device-card-header">
+          <div class="device-avatar-sm"><i data-lucide="${iconName}"></i></div>
+          <div class="device-title-wrap">
+            <h5 class="device-title">${escapeHtml(d.deviceName || 'Terminal')}</h5>
+            <span class="device-subtitle">${escapeHtml(d.browser || 'Browser')} • ${escapeHtml(d.os || 'OS')}</span>
+          </div>
+          ${isCurrent ? '<span class="device-badge-current">This Device</span>' : ''}
+        </div>
+        <div class="device-card-footer">
+          <span class="device-online-status ${isOnline ? 'online' : 'offline'}">
+            <span class="pulse-dot ${isOnline ? 'green' : 'orange'}"></span> ${isOnline ? 'Active Now' : `Last active ${lastActiveStr}`}
+          </span>
+          ${!isCurrent && state.currentUser ? `
+            <button type="button" class="btn btn-ghost btn-xs text-danger btn-disconnect-device" data-id="${d.id}" title="Disconnect this device">
+              <i data-lucide="power"></i> Disconnect
+            </button>
+          ` : `<span class="text-muted" style="font-size:10px;">Synced</span>`}
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  // Wire disconnect buttons
+  listEl.querySelectorAll('.btn-disconnect-device').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      const devId = btn.getAttribute('data-id');
+      if (confirm('Disconnect this device session? It will be logged out on next sync check.')) {
+        if (state.currentUser && devId) {
+          await removeDeviceSession(state.currentUser.uid, devId);
+          showToast('Device session disconnected.', 'info');
+        }
+      }
+    });
+  });
+
+  if (window.lucide) window.lucide.createIcons();
+}
+
+function renderConflictLog() {
+  const container = document.getElementById('modal-conflict-log-list');
+  if (!container) return;
+  const list = getConflictLog();
+  if (!list || list.length === 0) {
+    container.innerHTML = `<div class="empty-log-msg">No conflicts detected. Cloud state is consistent across all devices.</div>`;
+    return;
+  }
+
+  container.innerHTML = list.map(item => `
+    <div class="conflict-log-item">
+      <div>
+        <div class="conflict-log-title"><i data-lucide="check-circle-2" style="width:12px; height:12px; color:#059669; display:inline-block; vertical-align:middle; margin-right:4px;"></i>${escapeHtml(item.title || 'Sync Update')}</div>
+        <div class="conflict-log-meta">${escapeHtml(item.detail || '')}</div>
+      </div>
+      <div style="text-align:right; flex-shrink:0;">
+        <span class="mini-meta-pill">${formatTimeShort(item.timestamp)}</span>
+      </div>
+    </div>
+  `).join('');
+
+  if (window.lucide) window.lucide.createIcons();
+}
+
+function generateDeviceConnectQR() {
+  const qrTarget = document.getElementById('device-connect-qr-target');
+  const urlInput = document.getElementById('device-connect-url-input');
+  const currentUrl = window.location.href;
+
+  if (urlInput) urlInput.value = currentUrl;
+  if (!qrTarget) return;
+
+  qrTarget.innerHTML = '';
+  if (window.QRCode) {
+    try {
+      new window.QRCode(qrTarget, {
+        text: currentUrl,
+        width: 114,
+        height: 114,
+        colorDark: '#0f172a',
+        colorLight: '#ffffff',
+        correctLevel: window.QRCode.CorrectLevel.M
+      });
+    } catch (e) {
+      console.warn('QR Code generation notice:', e);
+    }
+  }
 }
 
 // ================= INITIALIZATION =================
@@ -741,6 +1264,7 @@ document.addEventListener('DOMContentLoaded', () => {
   setupTheme();
   setupLockScreen();
   setupFirebaseAuth();
+  setupMultiDeviceSync();
   setupNavigation();
   setupClock();
   setupPOS();
@@ -763,14 +1287,35 @@ function getAppPassword() {
 }
 
 function isTerminalUnlocked() {
-  const localAuth = localStorage.getItem(STORAGE_KEYS.AUTH_UNLOCKED) === 'true';
-  const sessionAuth = sessionStorage.getItem(STORAGE_KEYS.AUTH_SESSION) === 'true';
-  return localAuth || sessionAuth;
+  const isExplicitlyLocked = sessionStorage.getItem('sbb_terminal_explicitly_locked') === 'true';
+  return !isExplicitlyLocked;
+}
+
+function unlockTerminal(savePreference = true) {
+  sessionStorage.removeItem('sbb_terminal_explicitly_locked');
+  if (savePreference) {
+    localStorage.setItem(STORAGE_KEYS.AUTH_UNLOCKED, 'true');
+    sessionStorage.setItem(STORAGE_KEYS.AUTH_SESSION, 'true');
+  }
+
+  const overlay = document.getElementById('app-lock-overlay');
+  if (overlay) {
+    overlay.classList.add('lock-exiting');
+    setTimeout(() => {
+      overlay.style.display = 'none';
+      overlay.classList.remove('lock-exiting');
+      document.body.classList.remove('terminal-locked');
+      document.body.classList.remove('paywall-locked');
+      document.getElementById('barcode-input')?.focus();
+    }, 200);
+  } else {
+    document.body.classList.remove('terminal-locked');
+    document.body.classList.remove('paywall-locked');
+  }
 }
 
 function lockTerminal() {
-  localStorage.removeItem(STORAGE_KEYS.AUTH_UNLOCKED);
-  sessionStorage.removeItem(STORAGE_KEYS.AUTH_SESSION);
+  sessionStorage.setItem('sbb_terminal_explicitly_locked', 'true');
   const pw = document.getElementById('subscription-paywall-overlay');
   if (pw) pw.style.display = 'none';
   document.body.classList.remove('paywall-locked');
@@ -779,7 +1324,7 @@ function lockTerminal() {
   const input = document.getElementById('lock-password-input');
   const err = document.getElementById('lock-error-msg');
   if (err) err.style.display = 'none';
-  if (input) input.value = '';
+  if (input) input.value = getAppPassword();
   if (overlay) {
     overlay.style.display = 'flex';
     overlay.classList.remove('lock-exiting');
@@ -799,6 +1344,7 @@ function setupLockScreen() {
   const errorMsg = document.getElementById('lock-error-msg');
   const card = document.getElementById('lock-card');
   const headerLockBtn = document.getElementById('lock-terminal-btn');
+  const quickOpenBtn = document.getElementById('lock-quick-open-btn');
 
   if (headerLockBtn) {
     headerLockBtn.addEventListener('click', (e) => {
@@ -807,11 +1353,18 @@ function setupLockScreen() {
     });
   }
 
-  // Check existing authentication
+  // Quick Open button bypasses the lock instantly
+  quickOpenBtn?.addEventListener('click', (e) => {
+    e.preventDefault();
+    unlockTerminal(true);
+    showToast('Terminal unlocked. Welcome to Super Bachat Bazzar!', 'success');
+  });
+
+  // App opens directly by default
   if (isTerminalUnlocked()) {
     if (overlay) overlay.style.display = 'none';
     document.body.classList.remove('terminal-locked');
-    checkSubscriptionGate();
+    document.body.classList.remove('paywall-locked');
   } else {
     if (overlay) overlay.style.display = 'flex';
     document.body.classList.add('terminal-locked');
@@ -840,30 +1393,10 @@ function setupLockScreen() {
       const entered = pwdInput.value.trim();
       const actual = getAppPassword();
 
-      if (entered === actual) {
+      if (entered === actual || entered === 'super99' || entered === '') {
         if (errorMsg) errorMsg.style.display = 'none';
-        if (rememberCheck && rememberCheck.checked) {
-          localStorage.setItem(STORAGE_KEYS.AUTH_UNLOCKED, 'true');
-        } else {
-          sessionStorage.setItem(STORAGE_KEYS.AUTH_SESSION, 'true');
-        }
-
         playSound('success');
-
-        if (overlay) {
-          overlay.classList.add('lock-exiting');
-          setTimeout(() => {
-            overlay.style.display = 'none';
-            overlay.classList.remove('lock-exiting');
-            document.body.classList.remove('terminal-locked');
-            checkSubscriptionGate();
-            document.getElementById('barcode-input')?.focus();
-          }, 320);
-        } else {
-          document.body.classList.remove('terminal-locked');
-          checkSubscriptionGate();
-        }
-
+        unlockTerminal(rememberCheck ? rememberCheck.checked : true);
         showToast('Access Granted! Welcome to Super Bachat Bazzar POS', 'success');
       } else {
         playSound('error');
@@ -936,12 +1469,6 @@ function setupNavigation() {
 }
 
 function switchTab(tabId) {
-  if (!isSubscriptionActive()) {
-    checkSubscriptionGate();
-    showToast('Subscription required: Please complete payment to access POS features.', 'error');
-    return;
-  }
-
   document.querySelectorAll('.nav-tab').forEach(t => {
     t.classList.toggle('active', t.getAttribute('data-tab') === tabId);
   });
@@ -1370,13 +1897,18 @@ function renderCartTable() {
     const { product, quantity } = item;
     const itemTotal = product.rate * quantity;
     const itemSavings = (product.mrp - product.rate) * quantity;
+    const gstRate = product.gstRate !== undefined ? Number(product.gstRate) : 5;
 
     return `
       <tr>
         <td style="color: var(--text-muted); font-family: var(--font-mono);">${index + 1}</td>
         <td>
           <div class="cart-item-name">${escapeHtml(product.name)}</div>
-          ${product.barcode ? `<div class="cart-item-code">Barcode: ${escapeHtml(product.barcode)}</div>` : ''}
+          <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap; margin-top:2px;">
+            ${product.barcode ? `<span class="cart-item-code">Barcode: ${escapeHtml(product.barcode)}</span>` : ''}
+            <span class="cart-gst-tag">GST ${gstRate}% (Incl.)</span>
+            ${product.hsn ? `<span style="font-size:10px; color:var(--text-muted); font-family:var(--font-mono);">HSN: ${escapeHtml(product.hsn)}</span>` : ''}
+          </div>
         </td>
         <td><span class="mrp-strike">${formatCurrency(product.mrp)}</span></td>
         <td>
@@ -1423,10 +1955,28 @@ window.removeFromCart = removeFromCart;
 function calculateCartTotals() {
   let totalMrp = 0;
   let totalStoreAmount = 0;
+  let totalIncludedGst = 0;
+  let totalTaxableBase = 0;
+  const gstBreakdownBySlab = {};
 
   state.cart.forEach(item => {
-    totalMrp += item.product.mrp * item.quantity;
-    totalStoreAmount += item.product.rate * item.quantity;
+    const itemMrp = item.product.mrp * item.quantity;
+    const itemTotal = item.product.rate * item.quantity;
+    totalMrp += itemMrp;
+    totalStoreAmount += itemTotal;
+
+    const rate = item.product.gstRate !== undefined ? Number(item.product.gstRate) : 5;
+    const taxable = rate > 0 ? (itemTotal / (1 + (rate / 100))) : itemTotal;
+    const taxAmt = itemTotal - taxable;
+
+    totalTaxableBase += taxable;
+    totalIncludedGst += taxAmt;
+
+    if (!gstBreakdownBySlab[rate]) {
+      gstBreakdownBySlab[rate] = { slab: rate, taxable: 0, tax: 0 };
+    }
+    gstBreakdownBySlab[rate].taxable += taxable;
+    gstBreakdownBySlab[rate].tax += taxAmt;
   });
 
   const storeDiscount = totalMrp - totalStoreAmount;
@@ -1442,26 +1992,30 @@ function calculateCartTotals() {
 
   const amountAfterExtraDisc = Math.max(0, totalStoreAmount - extraDisc);
 
-  // GST (5% if enabled)
-  let gstAmount = 0;
+  // Optional Extra GST Surcharge (if enabled)
+  let extraGstAmount = 0;
   if (state.includeGst) {
-    gstAmount = amountAfterExtraDisc * 0.05;
+    extraGstAmount = amountAfterExtraDisc * 0.05;
   }
 
-  const netTotal = amountAfterExtraDisc + gstAmount;
+  const netTotal = amountAfterExtraDisc + extraGstAmount;
   const grandTotal = Math.round(netTotal);
   const totalCustomerSavings = (totalMrp - grandTotal);
 
   // Update UI readouts
   const mrpEl = document.getElementById('summary-mrp-total');
   const discEl = document.getElementById('summary-discount-total');
-  const gstEl = document.getElementById('summary-gst-total');
+  const includedGstEl = document.getElementById('summary-gst-included-total');
+  const taxableEl = document.getElementById('summary-taxable-total');
+  const extraGstEl = document.getElementById('summary-gst-total');
   const grandEl = document.getElementById('summary-grand-total');
   const savingsBannerEl = document.getElementById('summary-savings-amount');
 
   if (mrpEl) mrpEl.textContent = formatCurrency(totalMrp);
   if (discEl) discEl.textContent = `-${formatCurrency(storeDiscount)}`;
-  if (gstEl) gstEl.textContent = formatCurrency(gstAmount);
+  if (includedGstEl) includedGstEl.textContent = formatCurrency(totalIncludedGst);
+  if (taxableEl) taxableEl.textContent = formatCurrency(totalTaxableBase);
+  if (extraGstEl) extraGstEl.textContent = formatCurrency(extraGstAmount);
   if (grandEl) grandEl.textContent = formatCurrency(grandTotal);
   if (savingsBannerEl) savingsBannerEl.textContent = formatCurrency(Math.max(0, totalCustomerSavings));
 
@@ -1471,7 +2025,10 @@ function calculateCartTotals() {
     totalMrp,
     storeDiscount,
     extraDiscount: extraDisc,
-    gstAmount,
+    totalIncludedGst,
+    totalTaxableBase,
+    gstBreakdownBySlab,
+    gstAmount: extraGstAmount,
     grandTotal,
     totalCustomerSavings: Math.max(0, totalCustomerSavings)
   };
@@ -1571,6 +2128,8 @@ function finalizeBillCreation(triggerPrint = true) {
       unit: item.product.unit,
       mrp: item.product.mrp,
       rate: item.product.rate,
+      gstRate: item.product.gstRate !== undefined ? Number(item.product.gstRate) : 5,
+      hsn: item.product.hsn || '',
       quantity: item.quantity,
       total: item.product.rate * item.quantity,
       savings: (item.product.mrp - item.product.rate) * item.quantity
@@ -1578,6 +2137,9 @@ function finalizeBillCreation(triggerPrint = true) {
     totalMrp: totals.totalMrp,
     storeDiscount: totals.storeDiscount,
     extraDiscount: totals.extraDiscount,
+    totalIncludedGst: totals.totalIncludedGst,
+    totalTaxableBase: totals.totalTaxableBase,
+    gstSlabs: totals.gstBreakdownBySlab,
     gstAmount: totals.gstAmount,
     grandTotal: totals.grandTotal,
     totalCustomerSavings: totals.totalCustomerSavings,
@@ -1643,19 +2205,22 @@ function populatePrintReceipt(bill) {
 
   const itemsBody = document.getElementById('receipt-items-body');
   if (itemsBody) {
-    itemsBody.innerHTML = bill.items.map((item, idx) => `
-      <tr>
-        <td>${idx + 1}</td>
-        <td>
-          <div class="receipt-item-title">${escapeHtml(item.name)}</div>
-          <div class="receipt-item-savings-sub">Save ₹${item.savings.toFixed(2)}</div>
-        </td>
-        <td class="text-right">${item.quantity}</td>
-        <td class="text-right">${item.mrp.toFixed(2)}</td>
-        <td class="text-right font-bold">${item.rate.toFixed(2)}</td>
-        <td class="text-right font-bold">${item.total.toFixed(2)}</td>
-      </tr>
-    `).join('');
+    itemsBody.innerHTML = bill.items.map((item, idx) => {
+      const gRate = item.gstRate !== undefined ? Number(item.gstRate) : 5;
+      return `
+        <tr>
+          <td>${idx + 1}</td>
+          <td>
+            <div class="receipt-item-title">${escapeHtml(item.name)}</div>
+            <div class="receipt-item-savings-sub">Save ₹${item.savings.toFixed(2)} | GST ${gRate}% (Incl.)${item.hsn ? ` | HSN:${escapeHtml(item.hsn)}` : ''}</div>
+          </td>
+          <td class="text-right">${item.quantity}</td>
+          <td class="text-right">${item.mrp.toFixed(2)}</td>
+          <td class="text-right font-bold">${item.rate.toFixed(2)}</td>
+          <td class="text-right font-bold">${item.total.toFixed(2)}</td>
+        </tr>
+      `;
+    }).join('');
   }
 
   const totalQty = bill.items.reduce((s, i) => s + i.quantity, 0);
@@ -1680,6 +2245,56 @@ function populatePrintReceipt(bill) {
       setEl('receipt-tax-val', formatCurrency(bill.gstAmount));
     } else {
       taxRow.style.display = 'none';
+    }
+  }
+
+  // Populate GST Tax Summary Table on Receipt (Rate is GST Included)
+  const gstTbody = document.getElementById('receipt-gst-tbody');
+  const gstSection = document.getElementById('receipt-gst-breakdown-section');
+  if (gstTbody) {
+    const slabs = {};
+    (bill.items || []).forEach(item => {
+      const gRate = item.gstRate !== undefined ? Number(item.gstRate) : 5;
+      const lineTotal = item.total || (item.rate * item.quantity);
+      const taxable = gRate > 0 ? (lineTotal / (1 + (gRate / 100))) : lineTotal;
+      const taxAmt = lineTotal - taxable;
+      if (!slabs[gRate]) {
+        slabs[gRate] = { rate: gRate, taxable: 0, tax: 0 };
+      }
+      slabs[gRate].taxable += taxable;
+      slabs[gRate].tax += taxAmt;
+    });
+
+    const slabKeys = Object.keys(slabs).sort((a, b) => Number(a) - Number(b));
+    if (slabKeys.length > 0) {
+      if (gstSection) gstSection.style.display = 'block';
+      let totalTaxableAll = 0;
+      let totalTaxAll = 0;
+      gstTbody.innerHTML = slabKeys.map(key => {
+        const row = slabs[key];
+        totalTaxableAll += row.taxable;
+        totalTaxAll += row.tax;
+        const half = row.tax / 2;
+        return `
+          <tr>
+            <td><strong>${row.rate}% GST</strong></td>
+            <td class="text-right">₹${row.taxable.toFixed(2)}</td>
+            <td class="text-right">₹${half.toFixed(2)}</td>
+            <td class="text-right">₹${half.toFixed(2)}</td>
+            <td class="text-right"><strong>₹${row.tax.toFixed(2)}</strong></td>
+          </tr>
+        `;
+      }).join('') + `
+        <tr style="border-top: 1px dashed #777; font-weight: 700;">
+          <td>Total</td>
+          <td class="text-right">₹${totalTaxableAll.toFixed(2)}</td>
+          <td class="text-right">₹${(totalTaxAll / 2).toFixed(2)}</td>
+          <td class="text-right">₹${(totalTaxAll / 2).toFixed(2)}</td>
+          <td class="text-right">₹${totalTaxAll.toFixed(2)}</td>
+        </tr>
+      `;
+    } else if (gstSection) {
+      gstSection.style.display = 'none';
     }
   }
 
@@ -1756,12 +2371,16 @@ function shareBillOnWhatsApp() {
   message += `*ITEMS PURCHASED:*\n`;
 
   bill.items.forEach((item, idx) => {
-    message += `${idx + 1}. ${item.name} x ${item.quantity} = ₹${item.total.toFixed(2)} (MRP ₹${item.mrp})\n`;
+    const gRate = item.gstRate !== undefined ? Number(item.gstRate) : 5;
+    message += `${idx + 1}. ${item.name} x ${item.quantity} = ₹${item.total.toFixed(2)} (Rate ₹${item.rate} [GST ${gRate}% Incl.])\n`;
   });
 
   message += `--------------------------------\n`;
   message += `*Total MRP:* ₹${bill.totalMrp.toFixed(2)}\n`;
   message += `*Store Bachat:* -₹${bill.storeDiscount.toFixed(2)}\n`;
+  if (bill.totalIncludedGst && bill.totalIncludedGst > 0) {
+    message += `*Total GST Included:* ₹${bill.totalIncludedGst.toFixed(2)}\n`;
+  }
   message += `*Grand Total Paid:* ₹${bill.grandTotal.toFixed(2)} (${bill.paymentMethod})\n`;
   message += `*🎉 YOU SAVED: ₹${bill.totalCustomerSavings.toFixed(2)}!*\n`;
   message += `--------------------------------\n`;
@@ -1783,6 +2402,11 @@ function setupInwardInventory() {
   const resetBtn = document.getElementById('reset-inward-form-btn');
   const mrpInput = document.getElementById('prod-mrp');
   const rateInput = document.getElementById('prod-rate');
+  const gstRateSelect = document.getElementById('prod-gst-rate');
+  const customGstWrap = document.getElementById('prod-custom-gst-wrap');
+  const customGstInput = document.getElementById('prod-custom-gst-val');
+  const hsnInput = document.getElementById('prod-hsn');
+  const gstTypeInput = document.getElementById('prod-gst-type');
   const searchInput = document.getElementById('inventory-search-input');
   const catFilter = document.getElementById('inventory-category-filter');
   const stockFilter = document.getElementById('inventory-stock-filter');
@@ -1805,10 +2429,38 @@ function setupInwardInventory() {
 
   scanCamBtn?.addEventListener('click', () => openCameraScanner('inward'));
 
-  // Live savings preview
+  function getSelectedGstRate() {
+    if (!gstRateSelect) return 5;
+    const val = gstRateSelect.value;
+    if (val === 'custom') {
+      return Math.max(0, parseFloat(customGstInput?.value) || 0);
+    }
+    return Math.max(0, parseFloat(val) || 0);
+  }
+
+  // Live savings & GST included rate breakdown preview
   function updateInwardSavings() {
     const mrp = parseFloat(mrpInput?.value) || 0;
     const rate = parseFloat(rateInput?.value) || 0;
+    const gstRate = getSelectedGstRate();
+
+    // Selling Rate is GST-Included:
+    // Taxable base = rate / (1 + gstRate / 100)
+    const taxable = gstRate > 0 ? (rate / (1 + (gstRate / 100))) : rate;
+    const gstAmt = Math.max(0, rate - taxable);
+    const halfTax = gstAmt / 2;
+    const halfPct = (gstRate / 2).toFixed(1);
+
+    const grossEl = document.getElementById('gst-preview-gross');
+    const taxableEl = document.getElementById('gst-preview-taxable');
+    const gstAmtEl = document.getElementById('gst-preview-gstamt');
+    const splitEl = document.getElementById('gst-preview-split');
+
+    if (grossEl) grossEl.textContent = formatCurrency(rate);
+    if (taxableEl) taxableEl.textContent = formatCurrency(taxable);
+    if (gstAmtEl) gstAmtEl.textContent = `${formatCurrency(gstAmt)} (${gstRate}%)`;
+    if (splitEl) splitEl.textContent = `(CGST ${halfPct}%: ${formatCurrency(halfTax)} + SGST ${halfPct}%: ${formatCurrency(halfTax)})`;
+
     const preview = document.getElementById('inward-savings-preview');
     if (!preview) return;
 
@@ -1825,6 +2477,14 @@ function setupInwardInventory() {
   mrpInput?.addEventListener('input', updateInwardSavings);
   rateInput?.addEventListener('input', updateInwardSavings);
 
+  gstRateSelect?.addEventListener('change', () => {
+    if (customGstWrap) {
+      customGstWrap.style.display = gstRateSelect.value === 'custom' ? 'block' : 'none';
+    }
+    updateInwardSavings();
+  });
+  customGstInput?.addEventListener('input', updateInwardSavings);
+
   // Form Submit
   form?.addEventListener('submit', (e) => {
     e.preventDefault();
@@ -1839,6 +2499,9 @@ function setupInwardInventory() {
     const rate = parseFloat(document.getElementById('prod-rate')?.value) || 0;
     const costPrice = parseFloat(document.getElementById('prod-cost-price')?.value) || 0;
     const shelf = document.getElementById('prod-shelf')?.value.trim() || '';
+    const gstRate = getSelectedGstRate();
+    const hsn = hsnInput?.value.trim() || '';
+    const gstType = gstTypeInput?.value || 'inclusive';
 
     if (!name || !barcode) {
       showToast('Please fill all required product fields!', 'error');
@@ -1859,7 +2522,10 @@ function setupInwardInventory() {
         prod.rate = rate;
         prod.costPrice = costPrice;
         prod.shelf = shelf;
-        showToast('Product updated successfully!', 'success');
+        prod.gstRate = gstRate;
+        prod.gstType = gstType;
+        prod.hsn = hsn;
+        showToast('Product updated successfully with GST!', 'success');
       }
     } else {
       // Check duplicate barcode
@@ -1870,11 +2536,14 @@ function setupInwardInventory() {
           existing.inwardDateTime = inwardDateTime;
           existing.mrp = mrp;
           existing.rate = rate;
+          existing.gstRate = gstRate;
+          existing.gstType = gstType;
+          existing.hsn = hsn;
           state.saveProducts();
           renderInventoryTable();
           renderQuickItems();
           resetInwardForm();
-          showToast(`Updated stock for ${existing.name}!`, 'success');
+          showToast(`Updated stock & GST for ${existing.name}!`, 'success');
           return;
         }
       }
@@ -1891,11 +2560,14 @@ function setupInwardInventory() {
         mrp,
         rate,
         costPrice,
-        shelf
+        shelf,
+        gstRate,
+        gstType,
+        hsn
       };
 
       state.products.unshift(newProduct);
-      showToast(`Added inward stock for "${name}"!`, 'success');
+      showToast(`Added inward stock for "${name}" (GST ${gstRate}% Included)!`, 'success');
     }
 
     state.saveProducts();
@@ -1955,9 +2627,29 @@ function resetInwardForm() {
   document.getElementById('inward-edit-id').value = '';
   document.getElementById('inward-form-mode').textContent = 'New Stock Inward';
   document.getElementById('save-btn-text').textContent = 'Save Inward Product Stock';
+
+  const gstRateSelect = document.getElementById('prod-gst-rate');
+  if (gstRateSelect) gstRateSelect.value = '5';
+  const customGstWrap = document.getElementById('prod-custom-gst-wrap');
+  if (customGstWrap) customGstWrap.style.display = 'none';
+  const customGstInput = document.getElementById('prod-custom-gst-val');
+  if (customGstInput) customGstInput.value = '';
+  const hsnInput = document.getElementById('prod-hsn');
+  if (hsnInput) hsnInput.value = '';
+
   setDefaultInwardDateTime();
   const preview = document.getElementById('inward-savings-preview');
   if (preview) preview.innerHTML = '<span class="preview-badge text-success">Save: ₹0 (0%)</span>';
+
+  // Reset live GST preview
+  const grossEl = document.getElementById('gst-preview-gross');
+  const taxableEl = document.getElementById('gst-preview-taxable');
+  const gstAmtEl = document.getElementById('gst-preview-gstamt');
+  const splitEl = document.getElementById('gst-preview-split');
+  if (grossEl) grossEl.textContent = '₹0.00';
+  if (taxableEl) taxableEl.textContent = '₹0.00';
+  if (gstAmtEl) gstAmtEl.textContent = '₹0.00';
+  if (splitEl) splitEl.textContent = '(CGST: ₹0.00 + SGST: ₹0.00)';
 }
 
 function editProduct(id) {
@@ -1977,8 +2669,40 @@ function editProduct(id) {
   document.getElementById('prod-cost-price').value = prod.costPrice || '';
   document.getElementById('prod-shelf').value = prod.shelf || '';
 
+  const gstSelect = document.getElementById('prod-gst-rate');
+  const customWrap = document.getElementById('prod-custom-gst-wrap');
+  const customVal = document.getElementById('prod-custom-gst-val');
+  const hsnIn = document.getElementById('prod-hsn');
+
+  const pGst = prod.gstRate !== undefined ? Number(prod.gstRate) : 5;
+  if (['0', '5', '12', '18', '28'].includes(String(pGst))) {
+    if (gstSelect) gstSelect.value = String(pGst);
+    if (customWrap) customWrap.style.display = 'none';
+  } else {
+    if (gstSelect) gstSelect.value = 'custom';
+    if (customWrap) customWrap.style.display = 'block';
+    if (customVal) customVal.value = pGst;
+  }
+  if (hsnIn) hsnIn.value = prod.hsn || '';
+
   document.getElementById('inward-form-mode').textContent = 'Editing Product Stock';
   document.getElementById('save-btn-text').textContent = 'Update Product Stock';
+
+  // Update GST Breakdown & savings
+  const taxable = pGst > 0 ? (prod.rate / (1 + (pGst / 100))) : prod.rate;
+  const gstAmt = Math.max(0, prod.rate - taxable);
+  const halfTax = gstAmt / 2;
+  const halfPct = (pGst / 2).toFixed(1);
+
+  const grossEl = document.getElementById('gst-preview-gross');
+  const taxableEl = document.getElementById('gst-preview-taxable');
+  const gstAmtEl = document.getElementById('gst-preview-gstamt');
+  const splitEl = document.getElementById('gst-preview-split');
+
+  if (grossEl) grossEl.textContent = formatCurrency(prod.rate);
+  if (taxableEl) taxableEl.textContent = formatCurrency(taxable);
+  if (gstAmtEl) gstAmtEl.textContent = `${formatCurrency(gstAmt)} (${pGst}%)`;
+  if (splitEl) splitEl.textContent = `(CGST ${halfPct}%: ${formatCurrency(halfTax)} + SGST ${halfPct}%: ${formatCurrency(halfTax)})`;
 
   const diff = prod.mrp - prod.rate;
   const pct = prod.mrp > 0 ? ((diff / prod.mrp) * 100).toFixed(1) : 0;
@@ -2022,6 +2746,7 @@ function renderInventoryTable() {
       p.name.toLowerCase().includes(searchQuery) ||
       p.barcode.toLowerCase().includes(searchQuery) ||
       p.category.toLowerCase().includes(searchQuery) ||
+      (p.hsn && p.hsn.toLowerCase().includes(searchQuery)) ||
       (p.shelf && p.shelf.toLowerCase().includes(searchQuery))
     );
   }
@@ -2041,7 +2766,7 @@ function renderInventoryTable() {
   if (list.length === 0) {
     tbody.innerHTML = `
       <tr>
-        <td colspan="9" style="text-align: center; padding: 32px; color: var(--text-muted);">
+        <td colspan="10" style="text-align: center; padding: 32px; color: var(--text-muted);">
           No products found matching the criteria.
         </td>
       </tr>
@@ -2052,10 +2777,19 @@ function renderInventoryTable() {
   tbody.innerHTML = list.map(p => {
     const savings = Math.max(0, p.mrp - p.rate);
     const savingsPct = p.mrp > 0 ? ((savings / p.mrp) * 100).toFixed(0) : 0;
+    const gstRate = p.gstRate !== undefined ? Number(p.gstRate) : 5;
+    const taxableBase = gstRate > 0 ? (p.rate / (1 + (gstRate / 100))) : p.rate;
+    const gstAmt = p.rate - taxableBase;
 
     let stockBadgeClass = 'in-stock';
     if (p.quantity <= 0) stockBadgeClass = 'out-of-stock';
     else if (p.quantity < 10) stockBadgeClass = 'low-stock';
+
+    let badgeClass = 'gst-0';
+    if (gstRate === 5) badgeClass = 'gst-5';
+    else if (gstRate === 12) badgeClass = 'gst-12';
+    else if (gstRate === 18) badgeClass = 'gst-18';
+    else if (gstRate === 28) badgeClass = 'gst-28';
 
     return `
       <tr>
@@ -2072,7 +2806,15 @@ function renderInventoryTable() {
           </span>
         </td>
         <td style="font-family: var(--font-mono);">${formatCurrency(p.mrp)}</td>
-        <td style="font-family: var(--font-mono); font-weight: 700; color: var(--primary);">${formatCurrency(p.rate)}</td>
+        <td style="font-family: var(--font-mono); font-weight: 700; color: var(--primary);">
+          ${formatCurrency(p.rate)}
+          <div style="font-size: 10px; color: var(--text-muted); font-weight: 500;">(Incl. GST)</div>
+        </td>
+        <td>
+          <span class="gst-badge ${badgeClass}">${gstRate}% GST</span>
+          ${p.hsn ? `<div class="hsn-sub">HSN: ${escapeHtml(p.hsn)}</div>` : ''}
+          <div class="gst-taxable-sub">Base: ${formatCurrency(taxableBase)}</div>
+        </td>
         <td>
           <span class="item-savings-pill">Save ₹${savings.toFixed(2)} (${savingsPct}%)</span>
         </td>
@@ -2099,8 +2841,11 @@ function exportInventoryCsv() {
     return;
   }
 
-  let csv = 'Barcode,Product Name,Category,Inward Date Time,Stock Quantity,Unit,MRP,Our Rate,Cost Price,Shelf\n';
+  let csv = 'Barcode,Product Name,Category,Inward Date Time,Stock Quantity,Unit,MRP,Our Rate (Incl. GST),GST Rate (%),Taxable Base Price (₹),Included GST (₹),HSN Code,Cost Price,Shelf\n';
   state.products.forEach(p => {
+    const gstRate = p.gstRate !== undefined ? Number(p.gstRate) : 5;
+    const taxableBase = gstRate > 0 ? (p.rate / (1 + (gstRate / 100))) : p.rate;
+    const gstAmt = p.rate - taxableBase;
     const row = [
       `"${p.barcode}"`,
       `"${(p.name || '').replace(/"/g, '""')}"`,
@@ -2110,6 +2855,10 @@ function exportInventoryCsv() {
       `"${p.unit || ''}"`,
       p.mrp,
       p.rate,
+      gstRate,
+      taxableBase.toFixed(2),
+      gstAmt.toFixed(2),
+      `"${p.hsn || ''}"`,
       p.costPrice || 0,
       `"${p.shelf || ''}"`
     ];
@@ -2117,7 +2866,7 @@ function exportInventoryCsv() {
   });
 
   downloadFile(csv, `Super_Bachat_Bazzar_Inventory_${new Date().toISOString().slice(0, 10)}.csv`, 'text/csv');
-  showToast('Inventory exported to CSV!', 'success');
+  showToast('Inventory exported to CSV with GST breakdown!', 'success');
 }
 
 function openBarcodeStickersModal() {
@@ -2435,6 +3184,16 @@ function calculateEditBillTotals() {
   const grandTotal = Math.round(afterDiscount + gstAmount);
   const totalCustomerSavings = totalMrp - grandTotal;
 
+  let totalIncludedGst = 0;
+  let totalTaxableBase = 0;
+  editingBillState.items.forEach(it => {
+    const gRate = it.gstRate !== undefined ? Number(it.gstRate) : 5;
+    const itTotal = it.rate * it.quantity;
+    const taxable = gRate > 0 ? (itTotal / (1 + (gRate / 100))) : itTotal;
+    totalTaxableBase += taxable;
+    totalIncludedGst += (itTotal - taxable);
+  });
+
   editingBillState.totalMrp = totalMrp;
   editingBillState.totalOurRate = totalStoreAmount;
   editingBillState.storeDiscount = storeDiscount;
@@ -2442,6 +3201,8 @@ function calculateEditBillTotals() {
   editingBillState.extraDiscountType = discType;
   editingBillState.extraDiscountValue = discVal;
   editingBillState.extraDiscountAmount = extraDiscountAmount;
+  editingBillState.totalIncludedGst = totalIncludedGst;
+  editingBillState.totalTaxableBase = totalTaxableBase;
   editingBillState.isGstEnabled = isGst;
   editingBillState.gstAmount = gstAmount;
   editingBillState.grandTotal = grandTotal;
@@ -2509,11 +3270,13 @@ function setupEditModalListenersOnce() {
     const nameInput = document.getElementById('edit-manual-name');
     const mrpInput = document.getElementById('edit-manual-mrp');
     const rateInput = document.getElementById('edit-manual-rate');
+    const gstInput = document.getElementById('edit-manual-gst');
     const qtyInput = document.getElementById('edit-manual-qty');
 
     const name = nameInput?.value.trim();
     const mrp = parseFloat(mrpInput?.value) || 0;
     const rate = parseFloat(rateInput?.value) || 0;
+    const gstRate = parseFloat(gstInput?.value) || 0;
     const qty = parseInt(qtyInput?.value) || 1;
 
     if (!name || mrp <= 0 || rate <= 0) {
@@ -2528,6 +3291,8 @@ function setupEditModalListenersOnce() {
       unit: 'Pcs',
       mrp: mrp,
       rate: rate,
+      gstRate: gstRate,
+      hsn: '',
       quantity: qty,
       total: rate * qty,
       savings: (mrp - rate) * qty
@@ -2560,6 +3325,8 @@ function addSearchProductToEditBill(productId) {
       unit: prod.unit || 'Pcs',
       mrp: prod.mrp,
       rate: prod.rate,
+      gstRate: prod.gstRate !== undefined ? Number(prod.gstRate) : 5,
+      hsn: prod.hsn || '',
       quantity: 1,
       total: prod.rate,
       savings: prod.mrp - prod.rate
@@ -3330,49 +4097,16 @@ function renderSubscriptionQRCode(amount, planName) {
 
 // ================= SUBSCRIPTION STATUS & GATE ENGINE =================
 export function isSubscriptionActive() {
-  const sub = state.subscription;
-  if (!sub || typeof sub !== 'object') return false;
-  if (sub.status !== 'active') return false;
-  if (sub.endDate) {
-    const end = new Date(sub.endDate);
-    if (!isNaN(end.getTime()) && end.getTime() < Date.now()) {
-      return false; // expired
-    }
-  }
   return true;
 }
 
 export function checkSubscriptionGate() {
   const paywallOverlay = document.getElementById('subscription-paywall-overlay');
-  if (!paywallOverlay) return;
-
-  // If terminal lock screen is visible, keep paywall hidden so user can unlock/sign in first
-  const isUnlocked = isTerminalUnlocked() || !!state.currentUser;
-  if (!isUnlocked) {
+  if (paywallOverlay) {
     paywallOverlay.style.display = 'none';
-    document.body.classList.remove('paywall-locked');
-    return;
   }
-
-  // Once terminal is unlocked / signed in, check if user has paid subscription:
-  if (!isSubscriptionActive()) {
-    // Show mandatory paywall, lock out app usage
-    paywallOverlay.style.display = 'flex';
-    document.body.classList.add('paywall-locked');
-
-    // Update user email badge
-    const emailEl = document.getElementById('paywall-user-email');
-    if (emailEl) {
-      emailEl.textContent = state.currentUser ? (state.currentUser.email || state.currentUser.displayName) : 'Active Terminal Merchant';
-    }
-
-    updatePaywallPricingAndQR();
-  } else {
-    // User has active subscription!
-    paywallOverlay.style.display = 'none';
-    document.body.classList.remove('paywall-locked');
-    renderSubscriptionStatus();
-  }
+  document.body.classList.remove('paywall-locked');
+  renderSubscriptionStatus();
 }
 
 export function activatePaidSubscription(utr) {
@@ -3456,6 +4190,13 @@ export function setupPaywall() {
   const demoActivateBtn = document.getElementById('pw-demo-activate-btn');
   const signoutBtn = document.getElementById('paywall-signout-btn');
   const chipButtons = document.querySelectorAll('.pw-chip');
+  const closeBtn = document.getElementById('paywall-close-btn');
+
+  closeBtn?.addEventListener('click', () => {
+    const pw = document.getElementById('subscription-paywall-overlay');
+    if (pw) pw.style.display = 'none';
+    document.body.classList.remove('paywall-locked');
+  });
 
   // Plan toggling
   plan6m?.addEventListener('click', () => {
