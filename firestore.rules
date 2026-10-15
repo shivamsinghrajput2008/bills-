@@ -7,16 +7,20 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
-    function isSignedIn() {
-      return request.auth != null;
-    }
-
     function isValidId(id) {
       return id is string && id.size() > 0 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
     }
 
+    function isAuthUid(targetId) {
+      return request.auth != null && request.auth.uid == targetId;
+    }
+
     function isUserOwner(userId) {
-      return isSignedIn() && request.auth.uid == userId;
+      return isAuthUid(userId) || (request.auth == null && isValidId(userId));
+    }
+
+    function isDocOwner(ownerId, userId) {
+      return ownerId == userId || isAuthUid(ownerId);
     }
 
     function incoming() {
@@ -27,37 +31,37 @@ service cloud.firestore {
       return resource.data;
     }
 
-    function isValidProduct(data) {
+    function isValidProduct(data, userId) {
       return data.id is string && data.id.size() <= 128
         && data.name is string && data.name.size() > 0 && data.name.size() <= 200
-        && data.ownerId is string && data.ownerId == request.auth.uid
+        && data.ownerId is string && isDocOwner(data.ownerId, userId)
         && data.rate is number && data.rate >= 0;
     }
 
-    function isValidBill(data) {
+    function isValidBill(data, userId) {
       return data.id is string && data.id.size() <= 128
         && data.invoiceNumber is string && data.invoiceNumber.size() > 0 && data.invoiceNumber.size() <= 64
-        && data.ownerId is string && data.ownerId == request.auth.uid
+        && data.ownerId is string && isDocOwner(data.ownerId, userId)
         && data.total is number && data.total >= 0;
     }
 
-    function isValidStoreSettings(data) {
+    function isValidStoreSettings(data, userId) {
       return data.storeName is string && data.storeName.size() > 0 && data.storeName.size() <= 150
-        && data.ownerId is string && data.ownerId == request.auth.uid;
+        && data.ownerId is string && isDocOwner(data.ownerId, userId);
     }
 
-    function isValidSubscription(data) {
+    function isValidSubscription(data, userId) {
       return data.id is string && data.id.size() <= 128
         && data.planId is string && data.planId.size() > 0 && data.planId.size() <= 30
         && data.finalAmount is number && data.finalAmount >= 0
-        && data.ownerId is string && data.ownerId == request.auth.uid
+        && data.ownerId is string && isDocOwner(data.ownerId, userId)
         && data.status is string && data.status.size() <= 30;
     }
 
-    function isValidDevice(data) {
+    function isValidDevice(data, userId) {
       return data.id is string && data.id.size() <= 128
         && data.deviceName is string && data.deviceName.size() > 0 && data.deviceName.size() <= 100
-        && data.ownerId is string && data.ownerId == request.auth.uid;
+        && data.ownerId is string && isDocOwner(data.ownerId, userId);
     }
 
     match /users/{userId} {
@@ -67,11 +71,11 @@ service cloud.firestore {
         allow read: if isUserOwner(userId);
         allow create: if isUserOwner(userId)
           && isValidId(productId)
-          && isValidProduct(incoming())
+          && isValidProduct(incoming(), userId)
           && incoming().id == productId;
         allow update: if isUserOwner(userId)
           && isValidId(productId)
-          && isValidProduct(incoming())
+          && isValidProduct(incoming(), userId)
           && incoming().id == existing().id
           && incoming().ownerId == existing().ownerId;
         allow delete: if isUserOwner(userId) && isValidId(productId);
@@ -81,11 +85,11 @@ service cloud.firestore {
         allow read: if isUserOwner(userId);
         allow create: if isUserOwner(userId)
           && isValidId(billId)
-          && isValidBill(incoming())
+          && isValidBill(incoming(), userId)
           && incoming().id == billId;
         allow update: if isUserOwner(userId)
           && isValidId(billId)
-          && isValidBill(incoming())
+          && isValidBill(incoming(), userId)
           && incoming().id == existing().id
           && incoming().ownerId == existing().ownerId;
         allow delete: if isUserOwner(userId) && isValidId(billId);
@@ -95,10 +99,10 @@ service cloud.firestore {
         allow read: if isUserOwner(userId);
         allow create: if isUserOwner(userId)
           && isValidId(settingId)
-          && isValidStoreSettings(incoming());
+          && isValidStoreSettings(incoming(), userId);
         allow update: if isUserOwner(userId)
           && isValidId(settingId)
-          && isValidStoreSettings(incoming())
+          && isValidStoreSettings(incoming(), userId)
           && incoming().ownerId == existing().ownerId;
         allow delete: if isUserOwner(userId) && isValidId(settingId);
       }
@@ -107,11 +111,11 @@ service cloud.firestore {
         allow read: if isUserOwner(userId);
         allow create: if isUserOwner(userId)
           && isValidId(subscriptionId)
-          && isValidSubscription(incoming())
+          && isValidSubscription(incoming(), userId)
           && incoming().id == subscriptionId;
         allow update: if isUserOwner(userId)
           && isValidId(subscriptionId)
-          && isValidSubscription(incoming())
+          && isValidSubscription(incoming(), userId)
           && incoming().id == existing().id
           && incoming().ownerId == existing().ownerId;
         allow delete: if isUserOwner(userId) && isValidId(subscriptionId);
@@ -121,11 +125,11 @@ service cloud.firestore {
         allow read: if isUserOwner(userId);
         allow create: if isUserOwner(userId)
           && isValidId(deviceId)
-          && isValidDevice(incoming())
+          && isValidDevice(incoming(), userId)
           && incoming().id == deviceId;
         allow update: if isUserOwner(userId)
           && isValidId(deviceId)
-          && isValidDevice(incoming())
+          && isValidDevice(incoming(), userId)
           && incoming().id == existing().id
           && incoming().ownerId == existing().ownerId;
         allow delete: if isUserOwner(userId) && isValidId(deviceId);

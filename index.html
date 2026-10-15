@@ -49,15 +49,16 @@
       </div>
 
       <div class="lock-auth-section">
-        <button type="button" id="lock-google-signin-btn" class="btn-google-auth">
-          <svg class="google-svg-icon" viewBox="0 0 24 24" width="20" height="20">
-            <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
-            <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
-            <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"/>
-            <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/>
-          </svg>
-          <span>Sign In with Google</span>
-        </button>
+        <div style="display: flex; gap: 8px; width: 100%; margin-bottom: 8px;">
+          <button type="button" id="lock-google-signin-btn" class="btn-google-auth" onclick="if(window.openAuthModal)window.openAuthModal('otp')" style="flex: 1; background: linear-gradient(135deg, #10b981, #059669); color: #ffffff; border: none; cursor: pointer; padding: 10px 14px; font-size: 13px;">
+            <i data-lucide="smartphone"></i>
+            <span>OTP Sign In</span>
+          </button>
+          <button type="button" id="lock-signup-btn" class="btn-google-auth" onclick="if(window.openAuthModal)window.openAuthModal('signup')" style="flex: 1; background: linear-gradient(135deg, #6366f1, #4f46e5); color: #ffffff; border: none; cursor: pointer; padding: 10px 14px; font-size: 13px;">
+            <i data-lucide="user-plus"></i>
+            <span>Sign Up</span>
+          </button>
+        </div>
         <div class="lock-divider">
           <span>or unlock with terminal password</span>
         </div>
@@ -364,15 +365,16 @@
 
       <!-- Firebase Cloud Auth status badge & sign in -->
       <div class="auth-header-container" id="auth-header-container">
-        <button type="button" class="btn btn-google-header" id="header-google-signin-btn" title="Sign In with Google to Sync Data">
-          <svg class="google-svg-icon" viewBox="0 0 24 24" width="16" height="16">
-            <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
-            <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
-            <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"/>
-            <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/>
-          </svg>
-          <span>Sign In</span>
-        </button>
+        <div class="auth-header-btn-group" id="auth-header-btn-group">
+          <button type="button" class="btn btn-google-header" id="header-google-signin-btn" onclick="if(window.openAuthModal)window.openAuthModal('otp')" title="Sign In with Phone OTP, Email, or Google">
+            <i data-lucide="log-in"></i>
+            <span>Sign In</span>
+          </button>
+          <button type="button" class="btn btn-header-signup" id="header-signup-btn" onclick="if(window.openAuthModal)window.openAuthModal('signup')" title="Create New Account">
+            <i data-lucide="user-plus"></i>
+            <span>Sign Up</span>
+          </button>
+        </div>
 
         <div class="user-profile-badge" id="user-profile-badge" style="display: none;">
           <img src="" alt="Merchant Profile" class="user-avatar" id="user-avatar-img">
@@ -1253,14 +1255,9 @@
               <button type="button" class="btn btn-outline" id="btn-force-cloud-sync">
                 <i data-lucide="refresh-cw"></i> Sync Now
               </button>
-              <button type="button" class="btn btn-outline" id="btn-settings-google-signin">
-                <svg class="google-svg-icon" viewBox="0 0 24 24" width="16" height="16">
-                  <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
-                  <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
-                  <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"/>
-                  <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/>
-                </svg>
-                <span>Sign In with Google</span>
+              <button type="button" class="btn btn-outline" id="btn-settings-google-signin" onclick="if(window.openAuthModal)window.openAuthModal('otp')">
+                <i data-lucide="user-check"></i>
+                <span>Sign In / Sign Up (OTP & Cloud Sync)</span>
               </button>
               <button type="button" class="btn btn-outline-danger" id="btn-settings-signout" style="display: none;">
                 <i data-lucide="log-out"></i> Sign Out
@@ -2090,6 +2087,263 @@
           <i data-lucide="lock" class="mini-icon"></i> End-to-end encrypted Firestore HTTPS transfer
         </span>
         <button class="btn btn-secondary" id="modal-close-sync-footer-btn">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL 7: UNIVERSAL AUTHENTICATION (PHONE OTP, EMAIL SIGN UP / SIGN IN & GOOGLE) -->
+  <div class="modal-backdrop" id="auth-modal" style="display: none;">
+    <div class="modal-dialog auth-modal-dialog">
+      <div class="modal-header auth-modal-header">
+        <div class="auth-modal-title-box">
+          <div class="auth-brand-logo">
+            <i data-lucide="shopping-bag"></i>
+          </div>
+          <div>
+            <h3 class="auth-modal-title">Super Bachat Bazzar</h3>
+            <p class="auth-modal-subtitle">Multi-Device Cloud Login & Real-Time Sync</p>
+          </div>
+        </div>
+        <button class="modal-close-btn" id="close-auth-modal-btn" type="button" title="Close login modal">
+          <i data-lucide="x"></i>
+        </button>
+      </div>
+
+      <div class="modal-body auth-modal-body">
+        <!-- Auth Method Tabs -->
+        <div class="auth-nav-tabs">
+          <button type="button" class="auth-nav-tab active" id="tab-btn-otp" data-target="panel-otp">
+            <i data-lucide="smartphone"></i>
+            <span>Mobile OTP</span>
+          </button>
+          <button type="button" class="auth-nav-tab" id="tab-btn-email" data-target="panel-email">
+            <i data-lucide="mail"></i>
+            <span>Email / Password</span>
+          </button>
+          <button type="button" class="auth-nav-tab" id="tab-btn-google" data-target="panel-google">
+            <i data-lucide="globe"></i>
+            <span>Google</span>
+          </button>
+        </div>
+
+        <!-- PANEL 1: MOBILE OTP SIGN IN -->
+        <div class="auth-tab-panel active" id="panel-otp">
+          <div class="otp-intro-banner">
+            <div class="otp-badge-tag"><i data-lucide="zap"></i> Recommended for POS</div>
+            <p>Fast login for cashiers & store managers via 10-digit mobile number with instant OTP.</p>
+          </div>
+
+          <!-- Phone Number Step -->
+          <form id="otp-request-form" class="auth-form" autocomplete="off">
+            <div class="form-group">
+              <label for="otp-phone-input" class="auth-label">Mobile Number</label>
+              <div class="phone-input-wrapper">
+                <span class="phone-country-code">🇮🇳 +91</span>
+                <input 
+                  type="tel" 
+                  id="otp-phone-input" 
+                  class="auth-input phone-input" 
+                  placeholder="Enter 10-digit number (e.g. 9876543210)" 
+                  maxlength="10" 
+                  pattern="[0-9]{10}"
+                  value="9876543210"
+                  required
+                >
+              </div>
+              <span class="input-hint">Click below to generate an instant 6-digit OTP code for terminal login.</span>
+            </div>
+
+            <button type="submit" class="btn btn-primary btn-block btn-lg" id="btn-request-otp">
+              <i data-lucide="send"></i>
+              <span>Send OTP Code</span>
+            </button>
+          </form>
+
+          <!-- OTP Verification Step (Hidden until OTP requested) -->
+          <div id="otp-verify-section" class="otp-verify-section" style="display: none; margin-top: 16px;">
+            <!-- Live OTP Simulated Alert / Test Banner -->
+            <div class="otp-code-alert" id="otp-code-alert">
+              <div class="otp-alert-header">
+                <div class="otp-alert-title">
+                  <i data-lucide="message-square"></i>
+                  <span>SMS Code Delivered</span>
+                </div>
+                <span class="otp-timer" id="otp-timer-display">10:00</span>
+              </div>
+              <div class="otp-alert-body">
+                <span>OTP for <strong id="otp-alert-phone">+91 98765 43210</strong> is:</span>
+                <strong class="otp-highlight-code" id="otp-code-value">482910</strong>
+              </div>
+              <button type="button" class="btn-autofill-otp" id="btn-autofill-otp">
+                <i data-lucide="check-check"></i> Auto-fill OTP Code
+              </button>
+            </div>
+
+            <form id="otp-verify-form" class="auth-form" autocomplete="off">
+              <div class="form-group">
+                <label for="otp-code-input" class="auth-label">Enter 6-Digit OTP</label>
+                <div class="otp-input-group">
+                  <input 
+                    type="text" 
+                    id="otp-code-input" 
+                    class="auth-input otp-digit-input" 
+                    placeholder="• • • • • •" 
+                    maxlength="6" 
+                    pattern="[0-9]{6}"
+                    autocomplete="one-time-code"
+                    required
+                  >
+                </div>
+              </div>
+
+              <div class="otp-actions-row">
+                <button type="button" class="btn-resend-otp" id="btn-resend-otp" disabled>
+                  Resend OTP in <span id="resend-countdown">30s</span>
+                </button>
+                <button type="button" class="btn-change-number" id="btn-change-number">Change Number</button>
+              </div>
+
+              <button type="submit" class="btn btn-success btn-block btn-lg" id="btn-verify-otp">
+                <i data-lucide="log-in"></i>
+                <span>Verify OTP & Sign In</span>
+              </button>
+            </form>
+          </div>
+        </div>
+
+        <!-- PANEL 2: EMAIL & PASSWORD (SIGN IN / SIGN UP) -->
+        <div class="auth-tab-panel" id="panel-email" style="display: none;">
+          <!-- Sub-mode toggle: Sign In vs Sign Up -->
+          <div class="auth-submode-toggle">
+            <button type="button" class="submode-pill active" id="submode-signin-btn">Sign In</button>
+            <button type="button" class="submode-pill" id="submode-signup-btn">Create Account (Sign Up)</button>
+          </div>
+
+          <!-- Form 1: Sign In -->
+          <form id="email-signin-form" class="auth-form">
+            <div class="form-group">
+              <label for="signin-email-input" class="auth-label">Email Address</label>
+              <input 
+                type="email" 
+                id="signin-email-input" 
+                class="auth-input" 
+                placeholder="merchant@superbachat.in" 
+                value="merchant@superbachat.in"
+                required
+              >
+            </div>
+            <div class="form-group">
+              <div class="auth-label-row">
+                <label for="signin-password-input" class="auth-label">Password</label>
+                <button type="button" class="link-toggle-pwd" id="toggle-signin-pwd">Show</button>
+              </div>
+              <input 
+                type="password" 
+                id="signin-password-input" 
+                class="auth-input" 
+                placeholder="Enter password (e.g. super99)" 
+                value="super99"
+                required
+              >
+            </div>
+            <button type="submit" class="btn btn-primary btn-block btn-lg" id="btn-submit-signin">
+              <i data-lucide="log-in"></i>
+              <span>Sign In to Terminal</span>
+            </button>
+          </form>
+
+          <!-- Form 2: Sign Up (Create Account) -->
+          <form id="email-signup-form" class="auth-form" style="display: none;">
+            <div class="form-group">
+              <label for="signup-name-input" class="auth-label">Full Name / Merchant Name</label>
+              <input 
+                type="text" 
+                id="signup-name-input" 
+                class="auth-input" 
+                placeholder="e.g. Rahul Kumar" 
+                required
+              >
+            </div>
+            <div class="form-group">
+              <label for="signup-email-input" class="auth-label">Email Address</label>
+              <input 
+                type="email" 
+                id="signup-email-input" 
+                class="auth-input" 
+                placeholder="rahul@superbachat.in" 
+                required
+              >
+            </div>
+            <div class="form-group">
+              <div class="auth-label-row">
+                <label for="signup-password-input" class="auth-label">Create Password</label>
+                <button type="button" class="link-toggle-pwd" id="toggle-signup-pwd">Show</button>
+              </div>
+              <input 
+                type="password" 
+                id="signup-password-input" 
+                class="auth-input" 
+                placeholder="At least 6 characters" 
+                minlength="6" 
+                required
+              >
+            </div>
+            <div class="form-group">
+              <label for="signup-role-select" class="auth-label">Terminal Role</label>
+              <select id="signup-role-select" class="auth-input auth-select">
+                <option value="Store Owner">Store Owner / General Manager</option>
+                <option value="Cashier" selected>Counter Cashier</option>
+                <option value="Inventory Manager">Inventory & Purchase Manager</option>
+              </select>
+            </div>
+            <button type="submit" class="btn btn-success btn-block btn-lg" id="btn-submit-signup">
+              <i data-lucide="user-plus"></i>
+              <span>Create Account & Start Sync</span>
+            </button>
+          </form>
+        </div>
+
+        <!-- PANEL 3: GOOGLE SIGN IN -->
+        <div class="auth-tab-panel" id="panel-google" style="display: none;">
+          <div class="google-panel-box">
+            <div class="google-panel-icon">
+              <svg viewBox="0 0 24 24" width="40" height="40">
+                <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"/>
+                <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/>
+              </svg>
+            </div>
+            <h4>One-Click Google Cloud Sync</h4>
+            <p>Authenticate with your store's Google account to automatically connect all devices.</p>
+            <button type="button" class="btn btn-google-auth-large btn-block" id="modal-google-signin-btn">
+              <svg class="google-svg-icon" viewBox="0 0 24 24" width="20" height="20">
+                <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"/>
+                <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/>
+              </svg>
+              <span>Continue with Google</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Quick 1-Click Demo Login Footer -->
+        <div class="auth-demo-footer">
+          <div class="demo-footer-divider">
+            <span>or fast merchant access</span>
+          </div>
+          <button type="button" class="btn-demo-merchant" id="btn-demo-merchant-login">
+            <i data-lucide="zap"></i>
+            <span>Instant Demo Merchant Login (Muzaffarpur Store)</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="modal-footer auth-modal-footer">
+        <span class="auth-security-notice">
+          <i data-lucide="shield-check"></i> 256-bit Encrypted Multi-Device Real-Time Sync
+        </span>
       </div>
     </div>
   </div>

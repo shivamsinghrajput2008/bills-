@@ -6,6 +6,12 @@
 import { 
   auth, 
   signInWithGoogle, 
+  requestPhoneOTP,
+  verifyPhoneOTP,
+  signUpWithEmail,
+  signInWithEmail,
+  demoMerchantSignIn,
+  getCurrentAuthUser,
   signOutUser, 
   subscribeToAuth, 
   subscribeToProducts, 
@@ -26,6 +32,7 @@ import {
   getDeviceMetadata,
   saveCustomDeviceName,
   registerDeviceSession,
+  setDeviceOffline,
   subscribeToDevices,
   removeDeviceSession,
   flushOfflineQueue,
@@ -635,8 +642,13 @@ let unsubSub = null;
 let unsubDevices = null;
 
 function setupFirebaseAuth() {
+  const authModal = document.getElementById('auth-modal');
+  const closeAuthModalBtn = document.getElementById('close-auth-modal-btn');
   const lockGoogleBtn = document.getElementById('lock-google-signin-btn');
+  const lockSignupBtn = document.getElementById('lock-signup-btn');
+  const headerBtnGroup = document.getElementById('auth-header-btn-group');
   const headerGoogleBtn = document.getElementById('header-google-signin-btn');
+  const headerSignupBtn = document.getElementById('header-signup-btn');
   const headerSignoutBtn = document.getElementById('header-signout-btn');
   const userProfileBadge = document.getElementById('user-profile-badge');
   const userAvatarImg = document.getElementById('user-avatar-img');
@@ -647,35 +659,394 @@ function setupFirebaseAuth() {
   const userEmailSpan = document.getElementById('firebase-user-email');
   const syncDesc = document.getElementById('firebase-sync-desc');
 
+  // Auth Modal Elements
+  const tabBtnOtp = document.getElementById('tab-btn-otp');
+  const tabBtnEmail = document.getElementById('tab-btn-email');
+  const tabBtnGoogle = document.getElementById('tab-btn-google');
+  const panelOtp = document.getElementById('panel-otp');
+  const panelEmail = document.getElementById('panel-email');
+  const panelGoogle = document.getElementById('panel-google');
+
+  // OTP elements
+  const otpRequestForm = document.getElementById('otp-request-form');
+  const otpPhoneInput = document.getElementById('otp-phone-input');
+  const btnRequestOtp = document.getElementById('btn-request-otp');
+  const otpVerifySection = document.getElementById('otp-verify-section');
+  const otpVerifyForm = document.getElementById('otp-verify-form');
+  const otpCodeInput = document.getElementById('otp-code-input');
+  const btnVerifyOtp = document.getElementById('btn-verify-otp');
+  const otpAlertPhone = document.getElementById('otp-alert-phone');
+  const otpCodeValue = document.getElementById('otp-code-value');
+  const btnAutofillOtp = document.getElementById('btn-autofill-otp');
+  const btnResendOtp = document.getElementById('btn-resend-otp');
+  const resendCountdown = document.getElementById('resend-countdown');
+  const btnChangeNumber = document.getElementById('btn-change-number');
+  const otpTimerDisplay = document.getElementById('otp-timer-display');
+
+  // Email elements
+  const submodeSigninBtn = document.getElementById('submode-signin-btn');
+  const submodeSignupBtn = document.getElementById('submode-signup-btn');
+  const emailSigninForm = document.getElementById('email-signin-form');
+  const emailSignupForm = document.getElementById('email-signup-form');
+  const signinEmailInput = document.getElementById('signin-email-input');
+  const signinPasswordInput = document.getElementById('signin-password-input');
+  const signupNameInput = document.getElementById('signup-name-input');
+  const signupEmailInput = document.getElementById('signup-email-input');
+  const signupPasswordInput = document.getElementById('signup-password-input');
+  const signupRoleSelect = document.getElementById('signup-role-select');
+  const toggleSigninPwd = document.getElementById('toggle-signin-pwd');
+  const toggleSignupPwd = document.getElementById('toggle-signup-pwd');
+
+  // Google & Demo buttons inside modal
+  const modalGoogleSigninBtn = document.getElementById('modal-google-signin-btn');
+  const btnDemoMerchantLogin = document.getElementById('btn-demo-merchant-login');
+
+  let resendInterval = null;
+  let codeTimerInterval = null;
+
+  // Open & Close Auth Modal
+  function openAuthModal(defaultTab = 'otp') {
+    if (!authModal) return;
+    authModal.style.display = 'flex';
+    // Force DOM repaint before adding .show for smooth CSS transition
+    requestAnimationFrame(() => {
+      authModal.classList.add('show');
+    });
+    switchAuthTab(defaultTab);
+    if (window.lucide) window.lucide.createIcons();
+    if (defaultTab === 'otp' && otpPhoneInput) {
+      setTimeout(() => otpPhoneInput.focus(), 150);
+    }
+  }
+
+  function closeAuthModal() {
+    if (!authModal) return;
+    authModal.classList.remove('show');
+    setTimeout(() => {
+      if (!authModal.classList.contains('show')) {
+        authModal.style.display = 'none';
+      }
+    }, 200);
+    clearInterval(resendInterval);
+    clearInterval(codeTimerInterval);
+  }
+
+  // Expose globally so that any click in DOM or inline onclick directly functions
+  window.openAuthModal = openAuthModal;
+  window.closeAuthModal = closeAuthModal;
+
+  // Switch Auth Tabs
+  function switchAuthTab(tabId) {
+    [tabBtnOtp, tabBtnEmail, tabBtnGoogle].forEach(btn => btn?.classList.remove('active'));
+    [panelOtp, panelEmail, panelGoogle].forEach(p => {
+      if (p) p.style.display = 'none';
+      p?.classList.remove('active');
+    });
+
+    if (tabId === 'otp') {
+      tabBtnOtp?.classList.add('active');
+      if (panelOtp) { panelOtp.style.display = 'block'; panelOtp.classList.add('active'); }
+    } else if (tabId === 'email' || tabId === 'signin' || tabId === 'signup') {
+      tabBtnEmail?.classList.add('active');
+      if (panelEmail) { panelEmail.style.display = 'block'; panelEmail.classList.add('active'); }
+      if (tabId === 'signup') {
+        submodeSignupBtn?.click();
+      } else {
+        submodeSigninBtn?.click();
+      }
+    } else if (tabId === 'google') {
+      tabBtnGoogle?.classList.add('active');
+      if (panelGoogle) { panelGoogle.style.display = 'block'; panelGoogle.classList.add('active'); }
+    }
+  }
+
+  tabBtnOtp?.addEventListener('click', () => switchAuthTab('otp'));
+  tabBtnEmail?.addEventListener('click', () => switchAuthTab('email'));
+  tabBtnGoogle?.addEventListener('click', () => switchAuthTab('google'));
+
+  closeAuthModalBtn?.addEventListener('click', closeAuthModal);
+  authModal?.addEventListener('click', (e) => {
+    if (e.target === authModal) closeAuthModal();
+  });
+
+  // Toggle Email Submode (Sign In vs Sign Up)
+  submodeSigninBtn?.addEventListener('click', () => {
+    submodeSigninBtn.classList.add('active');
+    submodeSignupBtn?.classList.remove('active');
+    if (emailSigninForm) emailSigninForm.style.display = 'block';
+    if (emailSignupForm) emailSignupForm.style.display = 'none';
+  });
+
+  submodeSignupBtn?.addEventListener('click', () => {
+    submodeSignupBtn.classList.add('active');
+    submodeSigninBtn?.classList.remove('active');
+    if (emailSignupForm) emailSignupForm.style.display = 'block';
+    if (emailSigninForm) emailSigninForm.style.display = 'none';
+  });
+
+  // Password visibility toggles
+  toggleSigninPwd?.addEventListener('click', () => {
+    if (!signinPasswordInput) return;
+    const isPass = signinPasswordInput.type === 'password';
+    signinPasswordInput.type = isPass ? 'text' : 'password';
+    toggleSigninPwd.textContent = isPass ? 'Hide' : 'Show';
+  });
+
+  toggleSignupPwd?.addEventListener('click', () => {
+    if (!signupPasswordInput) return;
+    const isPass = signupPasswordInput.type === 'password';
+    signupPasswordInput.type = isPass ? 'text' : 'password';
+    toggleSignupPwd.textContent = isPass ? 'Hide' : 'Show';
+  });
+
+  // Successful Authentication Helper
+  function onAuthSuccess(user, message = '') {
+    closeAuthModal();
+    localStorage.setItem(STORAGE_KEYS.AUTH_UNLOCKED, 'true');
+    const overlay = document.getElementById('app-lock-overlay');
+    if (overlay) {
+      overlay.classList.add('lock-exiting');
+      setTimeout(() => {
+        overlay.style.display = 'none';
+        overlay.classList.remove('lock-exiting');
+        document.body.classList.remove('terminal-locked');
+        checkSubscriptionGate();
+        document.getElementById('barcode-input')?.focus();
+      }, 320);
+    } else {
+      checkSubscriptionGate();
+    }
+    playSound('success');
+    showToast(message || `Welcome, ${user.displayName || user.phoneNumber || user.email}! Cloud Sync active.`, 'success');
+  }
+
+  // 1. Phone OTP Handlers
+  function startOtpCountdown() {
+    clearInterval(resendInterval);
+    clearInterval(codeTimerInterval);
+
+    let resendSeconds = 30;
+    if (btnResendOtp) {
+      btnResendOtp.disabled = true;
+      if (resendCountdown) resendCountdown.textContent = `${resendSeconds}s`;
+    }
+
+    resendInterval = setInterval(() => {
+      resendSeconds--;
+      if (resendCountdown) resendCountdown.textContent = `${resendSeconds}s`;
+      if (resendSeconds <= 0) {
+        clearInterval(resendInterval);
+        if (btnResendOtp) {
+          btnResendOtp.disabled = false;
+          btnResendOtp.textContent = 'Resend OTP';
+        }
+      }
+    }, 1000);
+
+    let expireSeconds = 600;
+    codeTimerInterval = setInterval(() => {
+      expireSeconds--;
+      const mins = Math.floor(expireSeconds / 60);
+      const secs = expireSeconds % 60;
+      if (otpTimerDisplay) {
+        otpTimerDisplay.textContent = `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+      }
+      if (expireSeconds <= 0) {
+        clearInterval(codeTimerInterval);
+        if (otpTimerDisplay) otpTimerDisplay.textContent = 'Expired';
+      }
+    }, 1000);
+  }
+
+  otpRequestForm?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const phone = otpPhoneInput?.value?.trim();
+    if (!phone) {
+      showToast('Please enter your 10-digit mobile number.', 'error');
+      return;
+    }
+
+    btnRequestOtp.disabled = true;
+    btnRequestOtp.innerHTML = '<i data-lucide="loader" class="spin"></i> Sending OTP...';
+    if (window.lucide) window.lucide.createIcons();
+
+    try {
+      const result = await requestPhoneOTP(phone);
+      if (otpVerifySection) otpVerifySection.style.display = 'block';
+      if (otpAlertPhone) otpAlertPhone.textContent = result.formattedPhone;
+      if (otpCodeValue) otpCodeValue.textContent = result.code;
+      if (otpCodeInput) {
+        otpCodeInput.value = '';
+        setTimeout(() => otpCodeInput.focus(), 100);
+      }
+      startOtpCountdown();
+      showToast(`OTP Code sent to ${result.formattedPhone}: ${result.code}`, 'success');
+      playSound('beep');
+    } catch (err) {
+      showToast(err.message || 'Failed to send OTP. Please check the number.', 'error');
+    } finally {
+      btnRequestOtp.disabled = false;
+      btnRequestOtp.innerHTML = '<i data-lucide="send"></i> <span>Send OTP Code</span>';
+      if (window.lucide) window.lucide.createIcons();
+    }
+  });
+
+  btnAutofillOtp?.addEventListener('click', () => {
+    const code = otpCodeValue?.textContent?.trim();
+    if (code && otpCodeInput) {
+      otpCodeInput.value = code;
+      showToast(`Auto-filled OTP: ${code}`, 'info');
+      otpCodeInput.focus();
+    }
+  });
+
+  otpVerifyForm?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const phone = otpPhoneInput?.value?.trim();
+    const code = otpCodeInput?.value?.trim();
+
+    if (!code || code.length !== 6) {
+      showToast('Please enter the 6-digit OTP code.', 'error');
+      return;
+    }
+
+    btnVerifyOtp.disabled = true;
+    btnVerifyOtp.innerHTML = '<i data-lucide="loader" class="spin"></i> Verifying...';
+    if (window.lucide) window.lucide.createIcons();
+
+    try {
+      const user = await verifyPhoneOTP(phone, code);
+      onAuthSuccess(user, `Verified phone ${user.phoneNumber}! Signed in to Super Bachat Bazzar.`);
+    } catch (err) {
+      showToast(err.message || 'OTP verification failed. Please try again.', 'error');
+      if (otpCodeInput) otpCodeInput.focus();
+    } finally {
+      btnVerifyOtp.disabled = false;
+      btnVerifyOtp.innerHTML = '<i data-lucide="log-in"></i> <span>Verify OTP & Sign In</span>';
+      if (window.lucide) window.lucide.createIcons();
+    }
+  });
+
+  btnResendOtp?.addEventListener('click', async () => {
+    const phone = otpPhoneInput?.value?.trim();
+    if (!phone) return;
+    try {
+      const result = await requestPhoneOTP(phone);
+      if (otpCodeValue) otpCodeValue.textContent = result.code;
+      startOtpCountdown();
+      showToast(`New OTP Code sent: ${result.code}`, 'info');
+    } catch (err) {
+      showToast(err.message, 'error');
+    }
+  });
+
+  btnChangeNumber?.addEventListener('click', () => {
+    if (otpVerifySection) otpVerifySection.style.display = 'none';
+    clearInterval(resendInterval);
+    clearInterval(codeTimerInterval);
+    if (otpPhoneInput) otpPhoneInput.focus();
+  });
+
+  // 2. Email Sign In Form Handler
+  emailSigninForm?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const email = signinEmailInput?.value?.trim();
+    const password = signinPasswordInput?.value;
+
+    const submitBtn = document.getElementById('btn-submit-signin');
+    if (submitBtn) {
+      submitBtn.disabled = true;
+      submitBtn.innerHTML = '<i data-lucide="loader" class="spin"></i> Signing in...';
+      if (window.lucide) window.lucide.createIcons();
+    }
+
+    try {
+      const user = await signInWithEmail(email, password);
+      onAuthSuccess(user, `Welcome back, ${user.displayName || user.email}! Terminal logged in.`);
+    } catch (err) {
+      showToast(err.message || 'Sign in failed. Please check credentials.', 'error');
+    } finally {
+      if (submitBtn) {
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = '<i data-lucide="log-in"></i> <span>Sign In to Terminal</span>';
+        if (window.lucide) window.lucide.createIcons();
+      }
+    }
+  });
+
+  // 3. Email Sign Up Form Handler
+  emailSignupForm?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const fullName = signupNameInput?.value?.trim();
+    const email = signupEmailInput?.value?.trim();
+    const password = signupPasswordInput?.value;
+    const role = signupRoleSelect?.value || 'Cashier';
+
+    const submitBtn = document.getElementById('btn-submit-signup');
+    if (submitBtn) {
+      submitBtn.disabled = true;
+      submitBtn.innerHTML = '<i data-lucide="loader" class="spin"></i> Creating account...';
+      if (window.lucide) window.lucide.createIcons();
+    }
+
+    try {
+      const user = await signUpWithEmail(fullName, email, password, role);
+      onAuthSuccess(user, `Account registered for ${user.displayName}! Signed in and syncing across devices.`);
+    } catch (err) {
+      showToast(err.message || 'Sign up failed. Please check your details.', 'error');
+    } finally {
+      if (submitBtn) {
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = '<i data-lucide="user-plus"></i> <span>Create Account & Start Sync</span>';
+        if (window.lucide) window.lucide.createIcons();
+      }
+    }
+  });
+
+  // 4. Google Sign-In Handler
   async function handleGoogleSignIn() {
     try {
       showToast('Opening Google Sign-In popup...', 'info');
       const user = await signInWithGoogle();
       if (user) {
-        localStorage.setItem(STORAGE_KEYS.AUTH_UNLOCKED, 'true');
-        const overlay = document.getElementById('app-lock-overlay');
-        if (overlay) {
-          overlay.classList.add('lock-exiting');
-          setTimeout(() => {
-            overlay.style.display = 'none';
-            overlay.classList.remove('lock-exiting');
-            document.body.classList.remove('terminal-locked');
-            checkSubscriptionGate();
-            document.getElementById('barcode-input')?.focus();
-          }, 320);
-        } else {
-          checkSubscriptionGate();
-        }
-        playSound('success');
-        showToast(`Welcome, ${user.displayName || user.email}! Multi-device Cloud Sync active.`, 'success');
+        onAuthSuccess(user, `Signed in with Google as ${user.displayName || user.email}!`);
       }
     } catch (err) {
       console.error('Google Sign-In error:', err);
       if (err.code !== 'auth/popup-closed-by-user') {
-        showToast(`Sign-in failed: ${err.message || 'Please check popup settings.'}`, 'error');
+        showToast(`Google Sign-in: ${err.message || 'Please check popup settings.'} Try OTP option instead!`, 'warning');
       }
     }
   }
+
+  // 5. One-Click Demo Store Manager Sign In
+  btnDemoMerchantLogin?.addEventListener('click', async () => {
+    try {
+      const user = await demoMerchantSignIn();
+      onAuthSuccess(user, 'Signed in as Store Manager (Muzaffarpur)! Multi-device real-time sync active.');
+    } catch (err) {
+      showToast('Demo login error: ' + err.message, 'error');
+    }
+  });
+
+  modalGoogleSigninBtn?.addEventListener('click', handleGoogleSignIn);
+
+  // Trigger Auth Modal from UI Buttons
+  lockGoogleBtn?.addEventListener('click', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    openAuthModal('otp');
+  });
+  headerGoogleBtn?.addEventListener('click', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    openAuthModal('otp');
+  });
+  settingsGoogleBtn?.addEventListener('click', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    openAuthModal('otp');
+  });
 
   async function handleSignOut() {
     try {
@@ -683,22 +1054,20 @@ function setupFirebaseAuth() {
         await setDeviceOffline(state.currentUser.uid);
       }
       await signOutUser();
-      showToast('Signed out of Google account.', 'info');
+      showToast('Signed out of terminal account.', 'info');
     } catch (err) {
       console.error('Sign-out error:', err);
       showToast('Error during sign out.', 'error');
     }
   }
 
-  lockGoogleBtn?.addEventListener('click', handleGoogleSignIn);
-  headerGoogleBtn?.addEventListener('click', handleGoogleSignIn);
-  settingsGoogleBtn?.addEventListener('click', handleGoogleSignIn);
   headerSignoutBtn?.addEventListener('click', handleSignOut);
   settingsSignoutBtn?.addEventListener('click', handleSignOut);
 
   forceSyncBtn?.addEventListener('click', async () => {
     if (!state.currentUser) {
-      showToast('Please sign in with Google first to sync cloud database!', 'error');
+      showToast('Please sign in with Phone OTP, Email, or Google first to sync cloud database!', 'error');
+      openAuthModal('otp');
       return;
     }
     showToast('Syncing all products, bills & settings to Cloud Firestore...', 'info');
@@ -729,20 +1098,22 @@ function setupFirebaseAuth() {
 
       if (headerGoogleBtn) headerGoogleBtn.style.display = 'none';
       if (userProfileBadge) userProfileBadge.style.display = 'flex';
+      const nameOrPhone = user.displayName || user.phoneNumber || user.email?.split('@')[0] || 'Merchant';
       if (userAvatarImg) {
-        userAvatarImg.src = user.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.displayName || user.email)}&background=ea580c&color=fff`;
+        userAvatarImg.src = user.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(nameOrPhone)}&background=10b981&color=fff`;
       }
       if (userDisplayName) {
-        userDisplayName.textContent = user.displayName || user.email.split('@')[0];
+        userDisplayName.textContent = nameOrPhone;
       }
 
-      if (userEmailSpan) userEmailSpan.textContent = user.email;
+      const displayAccount = user.phoneNumber ? `${user.phoneNumber} (${nameOrPhone})` : user.email;
+      if (userEmailSpan) userEmailSpan.textContent = displayAccount;
       const shareEmailEl = document.getElementById('modal-share-email');
-      if (shareEmailEl) shareEmailEl.textContent = user.email;
+      if (shareEmailEl) shareEmailEl.textContent = displayAccount;
 
       if (settingsSignoutBtn) settingsSignoutBtn.style.display = 'inline-flex';
       if (settingsGoogleBtn) settingsGoogleBtn.style.display = 'none';
-      if (syncDesc) syncDesc.textContent = `Active merchant account: ${user.email}. Real-time Multi-Device Firestore sync active.`;
+      if (syncDesc) syncDesc.textContent = `Active account: ${displayAccount}. Real-time Multi-Device Cloud Sync active.`;
 
       // Auto-unlock terminal if user authenticated with Google
       localStorage.setItem(STORAGE_KEYS.AUTH_UNLOCKED, 'true');
@@ -878,7 +1249,7 @@ function setupFirebaseAuth() {
       if (userEmailSpan) userEmailSpan.textContent = 'Not Signed In (Local Cache Mode)';
       if (settingsSignoutBtn) settingsSignoutBtn.style.display = 'none';
       if (settingsGoogleBtn) settingsGoogleBtn.style.display = 'inline-flex';
-      if (syncDesc) syncDesc.textContent = 'Store data is saved locally on this browser. Sign in with Google to synchronize across devices with Cloud Firestore.';
+      if (syncDesc) syncDesc.textContent = 'Store data is saved locally on this browser. Sign in with Phone OTP, Email, or Google to synchronize across devices in real-time.';
 
       if (!state.subscription || state.subscription.status !== 'active') {
         state.subscription = state.loadSubscription();
