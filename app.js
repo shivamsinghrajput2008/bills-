@@ -2586,13 +2586,11 @@ function populatePrintReceipt(bill) {
   const itemsBody = document.getElementById('receipt-items-body');
   if (itemsBody) {
     itemsBody.innerHTML = bill.items.map((item, idx) => {
-      const gRate = item.gstRate !== undefined ? Number(item.gstRate) : 5;
       return `
         <tr>
           <td>${idx + 1}</td>
           <td>
             <div class="receipt-item-title">${escapeHtml(item.name)}</div>
-            <div class="receipt-item-savings-sub">Save ₹${item.savings.toFixed(2)} | GST ${gRate}% (Incl.)${item.hsn ? ` | HSN:${escapeHtml(item.hsn)}` : ''}</div>
           </td>
           <td class="text-right">${item.quantity}</td>
           <td class="text-right">${item.mrp.toFixed(2)}</td>
