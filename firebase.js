@@ -882,7 +882,96 @@ export async function deleteProductFromFirestore(userId, productId) {
   }
 }
 
-// 2. Bills Cloud Sync
+// 2. Bills Cloud Sync & Normalization
+export function normalizeBillObject(raw) {
+  if (!raw || typeof raw !== 'object') {
+    return {
+      id: 'bill_' + Date.now(),
+      invoiceNumber: 'INV-000',
+      createdAt: new Date().toISOString(),
+      dateTime: new Date().toISOString(),
+      customerName: 'Cash Customer',
+      customerPhone: '',
+      items: [],
+      itemCount: 0,
+      totalMrp: 0,
+      totalCustomerSavings: 0,
+      grandTotal: 0,
+      total: 0,
+      paymentMethod: 'Cash'
+    };
+  }
+
+  // Handle Firestore Timestamp or ISO string
+  let createdAtStr = new Date().toISOString();
+  if (raw.createdAt) {
+    if (typeof raw.createdAt === 'string') {
+      createdAtStr = raw.createdAt;
+    } else if (raw.createdAt.toDate && typeof raw.createdAt.toDate === 'function') {
+      createdAtStr = raw.createdAt.toDate().toISOString();
+    } else if (raw.createdAt.seconds) {
+      createdAtStr = new Date(raw.createdAt.seconds * 1000).toISOString();
+    }
+  } else if (raw.dateTime) {
+    createdAtStr = typeof raw.dateTime === 'string' ? raw.dateTime : new Date().toISOString();
+  }
+
+  const grandTotal = Number(raw.grandTotal !== undefined ? raw.grandTotal : (raw.total !== undefined ? raw.total : 0)) || 0;
+  const savings = Number(raw.totalCustomerSavings) || 0;
+  const totalMrp = Number(raw.totalMrp !== undefined ? raw.totalMrp : (grandTotal + savings)) || 0;
+
+  const items = Array.isArray(raw.items) ? raw.items.map(it => {
+    const qty = Number(it.quantity) || 1;
+    const rate = Number(it.rate !== undefined ? it.rate : (it.ourRate !== undefined ? it.ourRate : 0)) || 0;
+    const mrp = Number(it.mrp !== undefined ? it.mrp : rate) || rate;
+    const total = Number(it.total !== undefined ? it.total : (rate * qty)) || 0;
+    const itemSavings = Number(it.savings !== undefined ? it.savings : Math.max(0, (mrp - rate) * qty)) || 0;
+    const costPrice = Number(it.costPrice !== undefined ? it.costPrice : (it.purchaseRate !== undefined ? it.purchaseRate : 0)) || 0;
+
+    return {
+      id: String(it.id || it.productId || ''),
+      productId: String(it.productId || it.id || ''),
+      name: String(it.name || 'Product Item'),
+      barcode: String(it.barcode || ''),
+      unit: String(it.unit || 'Pcs'),
+      mrp,
+      rate,
+      costPrice,
+      purchaseRate: costPrice,
+      quantity: qty,
+      total,
+      savings: itemSavings,
+      gstRate: Number(it.gstRate !== undefined ? it.gstRate : 5),
+      hsn: String(it.hsn || '')
+    };
+  }) : [];
+
+  return {
+    ...raw,
+    id: String(raw.id || 'bill-' + Date.now()),
+    invoiceNumber: String(raw.invoiceNumber || 'INV-000'),
+    customerName: String(raw.customerName || 'Cash Customer'),
+    customerPhone: String(raw.customerPhone || ''),
+    paymentMethod: String(raw.paymentMethod || 'Cash'),
+    createdAt: createdAtStr,
+    dateTime: createdAtStr,
+    items,
+    itemCount: items.length,
+    totalMrp,
+    totalCustomerSavings: savings,
+    grandTotal,
+    total: grandTotal,
+    subtotal: Number(raw.subtotal !== undefined ? raw.subtotal : grandTotal) || 0,
+    discount: Number(raw.discount || raw.extraDiscount || 0) || 0,
+    storeDiscount: Number(raw.storeDiscount || 0) || 0,
+    extraDiscount: Number(raw.extraDiscount || 0) || 0,
+    gstAmount: Number(raw.gstAmount || raw.tax || 0) || 0,
+    tax: Number(raw.tax || raw.gstAmount || 0) || 0,
+    totalIncludedGst: Number(raw.totalIncludedGst || 0) || 0,
+    version: Number(raw.version || 1)
+  };
+}
+
 export function subscribeToBills(userId, onBillsChanged, onError) {
   if (!userId) return () => {};
   const colPath = `users/${userId}/bills`;
@@ -891,9 +980,9 @@ export function subscribeToBills(userId, onBillsChanged, onError) {
   return onSnapshot(colRef, (snapshot) => {
     const bills = [];
     snapshot.forEach(docSnap => {
-      bills.push(docSnap.data());
+      bills.push(normalizeBillObject(docSnap.data()));
     });
-    bills.sort((a, b) => new Date(b.dateTime || 0) - new Date(a.dateTime || 0));
+    bills.sort((a, b) => new Date(b.createdAt || b.dateTime || 0) - new Date(a.createdAt || a.dateTime || 0));
     setSyncState(navigator.onLine ? SyncState.SYNCED : SyncState.OFFLINE);
     localStorage.setItem(STORAGE_KEYS.LAST_SYNC_TIME, new Date().toISOString());
     onBillsChanged(bills);
@@ -909,31 +998,49 @@ async function executeDirectBillSave(userId, bill) {
   const docRef = doc(db, 'users', userId, 'bills', docId);
   const currentDeviceId = getDeviceId();
 
+  const total = Number(bill.total !== undefined ? bill.total : (bill.grandTotal !== undefined ? bill.grandTotal : 0)) || 0;
+  const grandTotal = Number(bill.grandTotal !== undefined ? bill.grandTotal : total) || 0;
+  const savings = Number(bill.totalCustomerSavings) || 0;
+  const totalMrp = Number(bill.totalMrp !== undefined ? bill.totalMrp : (grandTotal + savings)) || 0;
+
   const cleanBill = {
     id: docId,
     invoiceNumber: String(bill.invoiceNumber || '').slice(0, 64),
-    dateTime: String(bill.dateTime || new Date().toISOString()).slice(0, 50),
+    dateTime: String(bill.dateTime || bill.createdAt || new Date().toISOString()).slice(0, 50),
     customerName: String(bill.customerName || 'Walk-in Customer').slice(0, 100),
     customerPhone: String(bill.customerPhone || '').slice(0, 30),
     paymentMethod: String(bill.paymentMethod || 'Cash').slice(0, 40),
-    subtotal: Number(bill.subtotal) || 0,
-    discount: Number(bill.discount) || 0,
-    tax: Number(bill.tax) || 0,
-    total: Number(bill.total || bill.grandTotal) || 0,
+    subtotal: Number(bill.subtotal !== undefined ? bill.subtotal : grandTotal) || 0,
+    discount: Number(bill.discount || bill.extraDiscount || 0) || 0,
+    storeDiscount: Number(bill.storeDiscount || 0) || 0,
+    extraDiscount: Number(bill.extraDiscount || 0) || 0,
+    tax: Number(bill.tax || bill.gstAmount || 0) || 0,
+    gstAmount: Number(bill.gstAmount || bill.tax || 0) || 0,
+    total,
+    grandTotal,
+    totalMrp,
+    totalCustomerSavings: savings,
+    totalIncludedGst: Number(bill.totalIncludedGst || 0) || 0,
     itemCount: Number(bill.itemCount || (bill.items ? bill.items.length : 0)),
-    items: Array.isArray(bill.items) ? bill.items.slice(0, 60).map(item => ({
-      id: sanitizeDocId(item.id || ''),
+    items: Array.isArray(bill.items) ? bill.items.slice(0, 100).map(item => ({
+      id: sanitizeDocId(item.id || item.productId || ''),
+      productId: sanitizeDocId(item.productId || item.id || ''),
       name: String(item.name || '').slice(0, 120),
+      barcode: String(item.barcode || '').slice(0, 60),
       rate: Number(item.rate) || 0,
+      mrp: Number(item.mrp || item.rate) || 0,
+      costPrice: Number(item.costPrice || item.purchaseRate || 0),
+      purchaseRate: Number(item.purchaseRate || item.costPrice || 0),
       quantity: Number(item.quantity) || 1,
       unit: String(item.unit || 'Pcs').slice(0, 20),
-      total: Number(item.total) || 0,
+      total: Number(item.total || (Number(item.rate || 0) * Number(item.quantity || 1))) || 0,
+      savings: Number(item.savings || 0),
       gstRate: Number(item.gstRate !== undefined ? item.gstRate : 5)
     })) : [],
     ownerId: userId,
     version: Number(bill.version || 0) + 1,
     lastModifiedByDevice: String(bill.lastModifiedByDevice || currentDeviceId).slice(0, 100),
-    createdAt: String(bill.createdAt || new Date().toISOString()).slice(0, 50),
+    createdAt: String(bill.createdAt || bill.dateTime || new Date().toISOString()).slice(0, 50),
     updatedAt: new Date().toISOString()
   };
 

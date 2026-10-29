@@ -5685,3 +5685,450 @@ body.theme-dark .pw-qr-split {
   align-items: center;
   gap: 5px;
 }
+
+/* ==========================================================================
+   GROSS PROFIT & MARGIN ANALYSIS MODULE
+   ========================================================================== */
+.profit-layout {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  max-width: 1500px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.profit-header-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 20px 24px;
+  box-shadow: var(--shadow-sm);
+}
+
+.profit-title-group .card-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text-main);
+  margin-bottom: 4px;
+}
+
+.profit-title-group .card-title i {
+  color: #10b981;
+}
+
+.profit-toolbar {
+  margin-top: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.profit-preset-pills {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.profit-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 14px;
+  border-radius: 9999px;
+  border: 1px solid var(--border-color);
+  background: var(--bg-surface);
+  color: var(--text-main);
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  user-select: none;
+}
+
+.profit-pill i {
+  width: 14px;
+  height: 14px;
+  color: var(--text-muted);
+  transition: color 0.2s ease;
+}
+
+.profit-pill:hover {
+  border-color: #10b981;
+  background: rgba(16, 185, 129, 0.06);
+  color: #059669;
+}
+
+.profit-pill:hover i {
+  color: #059669;
+}
+
+.profit-pill.active {
+  background: #059669;
+  border-color: #059669;
+  color: #ffffff;
+  box-shadow: 0 2px 6px rgba(5, 150, 105, 0.25);
+}
+
+.profit-pill.active i {
+  color: #ffffff;
+}
+
+.profit-controls-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding-top: 14px;
+  border-top: 1px dashed var(--border-color);
+}
+
+.profit-custom-range {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.profit-custom-range .range-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.profit-custom-range .range-label i {
+  width: 14px;
+  height: 14px;
+  color: var(--primary);
+}
+
+.date-input-wrap {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-color);
+  padding: 4px 8px;
+  border-radius: var(--radius-sm);
+}
+
+.date-input-wrap label {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.date-input-wrap input[type="date"] {
+  border: none;
+  background: transparent;
+  color: var(--text-main);
+  font-size: 12.5px;
+  font-family: inherit;
+  outline: none;
+}
+
+.profit-search-and-export {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  max-width: 500px;
+}
+
+/* 4 KPI Summary Cards Grid */
+.profit-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 16px;
+}
+
+.profit-kpi-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 20px;
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  box-shadow: var(--shadow-sm);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.profit-kpi-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+}
+
+.profit-kpi-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: var(--border-color);
+}
+
+.profit-kpi-card.kpi-sales::before { background: #3b82f6; }
+.profit-kpi-card.kpi-cost::before { background: #f59e0b; }
+.profit-kpi-card.kpi-profit::before { background: #10b981; }
+.profit-kpi-card.kpi-margin::before { background: #8b5cf6; }
+
+.profit-kpi-card .kpi-icon-wrap {
+  width: 48px;
+  height: 48px;
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.profit-kpi-card.kpi-sales .kpi-icon-wrap {
+  background: rgba(59, 130, 246, 0.12);
+  color: #2563eb;
+}
+
+.profit-kpi-card.kpi-cost .kpi-icon-wrap {
+  background: rgba(245, 158, 11, 0.12);
+  color: #d97706;
+}
+
+.profit-kpi-card.kpi-profit .kpi-icon-wrap {
+  background: rgba(16, 185, 129, 0.14);
+  color: #059669;
+}
+
+.profit-kpi-card.kpi-margin .kpi-icon-wrap {
+  background: rgba(139, 92, 246, 0.12);
+  color: #7c3aed;
+}
+
+.profit-kpi-card .kpi-icon-wrap i {
+  width: 24px;
+  height: 24px;
+}
+
+.profit-kpi-card .kpi-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.profit-kpi-card .kpi-label {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.profit-kpi-card .kpi-value {
+  font-size: 24px;
+  font-weight: 800;
+  color: var(--text-main);
+  font-family: var(--font-mono);
+  letter-spacing: -0.5px;
+}
+
+.profit-kpi-card .kpi-value.profit-highlight {
+  color: #059669;
+}
+
+.profit-kpi-card .kpi-sub {
+  font-size: 11.5px;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+.profit-kpi-card .profit-sub-highlight {
+  color: #10b981;
+  font-weight: 600;
+}
+
+/* Margin Badge Pills */
+.margin-badge-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border-radius: 9999px;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.margin-badge-pill.green {
+  background: rgba(16, 185, 129, 0.12);
+  color: #059669;
+}
+
+.margin-badge-pill.amber {
+  background: rgba(245, 158, 11, 0.12);
+  color: #d97706;
+}
+
+.margin-badge-pill.red {
+  background: rgba(239, 68, 68, 0.12);
+  color: #dc2626;
+}
+
+.margin-badge-pill.blue {
+  background: rgba(59, 130, 246, 0.12);
+  color: #2563eb;
+}
+
+/* Profit Table Card */
+.profit-table-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+}
+
+.profit-table-header {
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border-color);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.profit-table-title-group {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.profit-table-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text-main);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.profit-badge-count {
+  font-size: 11.5px;
+  font-weight: 600;
+  background: var(--bg-subtle);
+  color: var(--text-muted);
+  padding: 3px 10px;
+  border-radius: 9999px;
+}
+
+.profit-table-info-note {
+  font-size: 12px;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.profit-table-info-note i {
+  width: 14px;
+  height: 14px;
+  color: #10b981;
+}
+
+/* Footer Totals Row */
+#profit-table-foot tr {
+  background: var(--bg-subtle);
+  border-top: 2px solid var(--border-color);
+  font-weight: 800;
+}
+
+#profit-table-foot td {
+  padding: 14px 16px;
+  font-size: 13.5px;
+  color: var(--text-main);
+  font-family: var(--font-mono);
+}
+
+.profit-cell-val {
+  font-family: var(--font-mono);
+  font-weight: 700;
+}
+
+.profit-cell-profit {
+  color: #059669;
+  font-weight: 800;
+  font-family: var(--font-mono);
+}
+
+.profit-cell-cost {
+  color: #b45309;
+  font-family: var(--font-mono);
+}
+
+/* Item Breakdown Modal Details */
+.pb-kpi-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 12px;
+  background: var(--bg-subtle);
+  padding: 14px 18px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-color);
+}
+
+.pb-kpi-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.pb-kpi-item.highlight .pb-kpi-val {
+  color: #059669;
+}
+
+.pb-kpi-lbl {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.pb-kpi-val {
+  font-size: 17px;
+  font-weight: 800;
+  font-family: var(--font-mono);
+  color: var(--text-main);
+}
+
+.btn-view-profit-breakdown {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 10px;
+  border-radius: var(--radius-xs);
+  border: 1px solid rgba(16, 185, 129, 0.35);
+  background: rgba(16, 185, 129, 0.08);
+  color: #059669;
+  font-size: 11.5px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-view-profit-breakdown:hover {
+  background: #059669;
+  color: #ffffff;
+}
+
+.btn-view-profit-breakdown i {
+  width: 13px;
+  height: 13px;
+}
+

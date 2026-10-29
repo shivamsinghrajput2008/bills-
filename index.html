@@ -336,6 +336,10 @@
           <i data-lucide="trending-up"></i>
           <span>Sale Analysis</span>
         </button>
+        <button class="nav-tab" data-tab="gross-profit" id="tab-gross-profit-btn">
+          <i data-lucide="calculator"></i>
+          <span>Gross Profit</span>
+        </button>
         <button class="nav-tab" data-tab="settings" id="tab-settings-btn">
           <i data-lucide="store"></i>
           <span>Store Settings</span>
@@ -1096,6 +1100,167 @@
             </div>
           </div>
 
+        </div>
+
+      </div>
+    </section>
+
+    <!-- TAB 4.5: GROSS PROFIT & MARGIN ANALYSIS -->
+    <section id="view-gross-profit" class="view-section">
+      <div class="profit-layout">
+        
+        <!-- Header Card with Preset Filter Pills & Custom Date Range -->
+        <div class="profit-header-card">
+          <div class="profit-title-group">
+            <h2 class="card-title">
+              <i data-lucide="calculator"></i>
+              Gross Profit &amp; Margin Analysis
+            </h2>
+            <p class="card-desc">Track real-time profitability: Sales Revenue, Product Purchase Cost (COGS), Gross Profit, and Margins with customizable timeframes.</p>
+          </div>
+
+          <!-- Filter Toolbar -->
+          <div class="profit-toolbar">
+            <!-- Preset Pills -->
+            <div class="profit-preset-pills" id="profit-preset-container">
+              <button type="button" class="profit-pill active" data-range="today">
+                <i data-lucide="clock"></i> Today
+              </button>
+              <button type="button" class="profit-pill" data-range="yesterday">
+                <i data-lucide="calendar"></i> Yesterday
+              </button>
+              <button type="button" class="profit-pill" data-range="7days">
+                <i data-lucide="calendar-days"></i> 7 Days
+              </button>
+              <button type="button" class="profit-pill" data-range="14days">
+                <i data-lucide="calendar-range"></i> 14 Days
+              </button>
+              <button type="button" class="profit-pill" data-range="30days">
+                <i data-lucide="calendar-check"></i> 30 Days
+              </button>
+              <button type="button" class="profit-pill" data-range="all">
+                <i data-lucide="layers"></i> All Time
+              </button>
+            </div>
+
+            <!-- Custom Calendar Range & Search Form -->
+            <div class="profit-controls-row">
+              <div class="profit-custom-range">
+                <span class="range-label"><i data-lucide="calendar"></i> Custom Date Range:</span>
+                <div class="date-input-wrap">
+                  <label for="profit-from-date">From</label>
+                  <input type="date" id="profit-from-date" class="form-input-sm">
+                </div>
+                <div class="date-input-wrap">
+                  <label for="profit-to-date">To</label>
+                  <input type="date" id="profit-to-date" class="form-input-sm">
+                </div>
+                <button type="button" class="btn btn-primary btn-sm" id="profit-apply-date-btn">
+                  <i data-lucide="filter"></i> Apply
+                </button>
+                <button type="button" class="btn btn-outline btn-sm" id="profit-reset-date-btn" title="Reset date filters">
+                  <i data-lucide="rotate-ccw"></i> Reset
+                </button>
+              </div>
+
+              <div class="profit-search-and-export">
+                <div class="search-box-wrap" style="flex: 1; min-width: 220px;">
+                  <i data-lucide="search"></i>
+                  <input type="text" id="profit-search-input" class="inventory-search-input" placeholder="Search bill no, customer, item...">
+                </div>
+                <button type="button" class="btn btn-outline btn-sm" id="export-profit-csv-btn">
+                  <i data-lucide="download"></i> Export Profit Report
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 4 KPI Summary Cards -->
+        <div class="profit-kpi-grid">
+          <div class="profit-kpi-card kpi-sales">
+            <div class="kpi-icon-wrap">
+              <i data-lucide="badge-indian-rupee"></i>
+            </div>
+            <div class="kpi-content">
+              <span class="kpi-label">Total Sales Revenue</span>
+              <h3 class="kpi-value" id="profit-kpi-sales">₹0.00</h3>
+              <span class="kpi-sub" id="profit-kpi-bills-count">0 sales bills in period</span>
+            </div>
+          </div>
+
+          <div class="profit-kpi-card kpi-cost">
+            <div class="kpi-icon-wrap">
+              <i data-lucide="truck"></i>
+            </div>
+            <div class="kpi-content">
+              <span class="kpi-label">Total Purchase Cost</span>
+              <h3 class="kpi-value" id="profit-kpi-cost">₹0.00</h3>
+              <span class="kpi-sub">Wholesale cost of goods sold</span>
+            </div>
+          </div>
+
+          <div class="profit-kpi-card kpi-profit">
+            <div class="kpi-icon-wrap">
+              <i data-lucide="trending-up"></i>
+            </div>
+            <div class="kpi-content">
+              <span class="kpi-label">Net Gross Profit</span>
+              <h3 class="kpi-value profit-highlight" id="profit-kpi-profit">₹0.00</h3>
+              <span class="kpi-sub profit-sub-highlight" id="profit-kpi-profit-sub">Sales Amount - Purchase Cost</span>
+            </div>
+          </div>
+
+          <div class="profit-kpi-card kpi-margin">
+            <div class="kpi-icon-wrap">
+              <i data-lucide="pie-chart"></i>
+            </div>
+            <div class="kpi-content">
+              <span class="kpi-label">Gross Margin %</span>
+              <h3 class="kpi-value" id="profit-kpi-margin">0.0%</h3>
+              <span class="kpi-sub" id="profit-kpi-margin-badge"><span class="margin-badge-pill green">Healthy Margin</span></span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Profit Table Card -->
+        <div class="profit-table-card">
+          <div class="profit-table-header">
+            <div class="profit-table-title-group">
+              <h3 class="profit-table-title">
+                <i data-lucide="receipt"></i>
+                <span id="profit-table-range-heading">Sales &amp; Gross Profit List (Today)</span>
+              </h3>
+              <span class="profit-badge-count" id="profit-rows-count">0 Sales Recorded</span>
+            </div>
+            <span class="profit-table-info-note">
+              <i data-lucide="info"></i> Click <strong>"View Breakdown"</strong> to inspect individual item purchase rates and item-level profits
+            </span>
+          </div>
+
+          <div class="table-responsive">
+            <table class="data-table" id="profit-table">
+              <thead>
+                <tr>
+                  <th>Invoice No.</th>
+                  <th>Date &amp; Time</th>
+                  <th>Customer</th>
+                  <th>Items Sold</th>
+                  <th style="text-align: right;">Sales Amount (₹)</th>
+                  <th style="text-align: right;">Purchase Cost (₹)</th>
+                  <th style="text-align: right;">Gross Profit (₹)</th>
+                  <th style="text-align: center;">Margin %</th>
+                  <th style="text-align: center;">Item Breakdown</th>
+                </tr>
+              </thead>
+              <tbody id="profit-table-body">
+                <!-- Populated dynamically -->
+              </tbody>
+              <tfoot id="profit-table-foot">
+                <!-- Populated dynamically with sum totals -->
+              </tfoot>
+            </table>
+          </div>
         </div>
 
       </div>
@@ -2344,6 +2509,74 @@
         <span class="auth-security-notice">
           <i data-lucide="shield-check"></i> 256-bit Encrypted Multi-Device Real-Time Sync
         </span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Itemized Gross Profit Breakdown Modal -->
+  <div id="profit-breakdown-modal" class="modal-backdrop">
+    <div class="modal-card modal-lg">
+      <div class="modal-header">
+        <div class="modal-header-icon" style="background: rgba(16, 185, 129, 0.12); color: #059669;">
+          <i data-lucide="calculator"></i>
+        </div>
+        <div class="modal-title-wrap">
+          <h3 class="modal-title" id="pb-invoice-title">Invoice - Gross Profit Breakdown</h3>
+          <span class="modal-subtitle" id="pb-meta-subtitle">Customer: Cash Customer • Date: -</span>
+        </div>
+        <button type="button" class="modal-close-btn" id="close-profit-breakdown-btn">
+          <i data-lucide="x"></i>
+        </button>
+      </div>
+
+      <div class="modal-body" style="padding: 20px;">
+        <!-- Modal Mini KPI Row -->
+        <div class="pb-kpi-row">
+          <div class="pb-kpi-item">
+            <span class="pb-kpi-lbl">Bill Sales Amount</span>
+            <strong class="pb-kpi-val" id="pb-kpi-sales">₹0.00</strong>
+          </div>
+          <div class="pb-kpi-item">
+            <span class="pb-kpi-lbl">Total Purchase Cost</span>
+            <strong class="pb-kpi-val" id="pb-kpi-cost">₹0.00</strong>
+          </div>
+          <div class="pb-kpi-item highlight">
+            <span class="pb-kpi-lbl">Bill Gross Profit</span>
+            <strong class="pb-kpi-val text-emerald" id="pb-kpi-profit">₹0.00</strong>
+          </div>
+          <div class="pb-kpi-item">
+            <span class="pb-kpi-lbl">Bill Margin %</span>
+            <strong class="pb-kpi-val" id="pb-kpi-margin">0.0%</strong>
+          </div>
+        </div>
+
+        <div class="table-responsive" style="margin-top: 16px;">
+          <table class="data-table" id="pb-items-table">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Product Name</th>
+                <th style="text-align: center;">Qty</th>
+                <th style="text-align: right;">Selling Rate (₹)</th>
+                <th style="text-align: right;">Purchase Rate (₹)</th>
+                <th style="text-align: right;">Total Sale (₹)</th>
+                <th style="text-align: right;">Total Cost (₹)</th>
+                <th style="text-align: right;">Item Profit (₹)</th>
+                <th style="text-align: center;">Margin %</th>
+              </tr>
+            </thead>
+            <tbody id="pb-items-tbody">
+              <!-- Populated dynamically -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="modal-footer" style="display: flex; justify-content: flex-end; gap: 10px;">
+        <button type="button" class="btn btn-secondary" id="pb-close-bottom-btn">Close</button>
+        <button type="button" class="btn btn-outline" id="pb-print-invoice-btn">
+          <i data-lucide="printer"></i> View Full Bill Receipt
+        </button>
       </div>
     </div>
   </div>

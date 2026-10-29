@@ -20,6 +20,7 @@ import {
   subscribeToBills, 
   saveBillToFirestore, 
   deleteBillFromFirestore, 
+  normalizeBillObject,
   subscribeToSettings, 
   saveSettingsToFirestore, 
   subscribeToSubscription,
@@ -384,7 +385,8 @@ class AppState {
     const data = localStorage.getItem(STORAGE_KEYS.BILLS);
     if (!data) return [];
     try {
-      return JSON.parse(data);
+      const parsed = JSON.parse(data);
+      return Array.isArray(parsed) ? parsed.map(b => normalizeBillObject(b)) : [];
     } catch {
       return [];
     }
@@ -1197,10 +1199,11 @@ function setupFirebaseAuth() {
             }
           }
 
-          state.bills = cloudBills;
+          state.bills = Array.isArray(cloudBills) ? cloudBills.map(b => normalizeBillObject(b)) : [];
           localStorage.setItem(STORAGE_KEYS.BILLS, JSON.stringify(state.bills));
           renderHistoryTable();
           renderAnalytics();
+          renderGrossProfit();
           updateCounters();
         }
       });
@@ -1642,6 +1645,7 @@ document.addEventListener('DOMContentLoaded', () => {
   setupInwardInventory();
   setupBillHistory();
   setupAnalytics();
+  setupGrossProfit();
   setupSettings();
   setupSubscription();
   setupPaywall();
@@ -1858,6 +1862,8 @@ function switchTab(tabId) {
     renderHistoryTable();
   } else if (tabId === 'analytics') {
     renderAnalytics();
+  } else if (tabId === 'gross-profit') {
+    renderGrossProfit();
   } else if (tabId === 'subscription') {
     updatePlanSelectionUI();
     renderSubscriptionStatus();
@@ -2522,9 +2528,12 @@ function finalizeBillCreation(triggerPrint = true) {
   };
 
   state.bills.unshift(bill);
-  state.saveBills();
+  state.saveBills(bill);
   state.incrementInvoiceNumber();
   updateInvoicePreview();
+  renderHistoryTable();
+  renderAnalytics();
+  renderGrossProfit();
 
   // Sound & Confetti celebration
   playSound('success');
@@ -3305,26 +3314,30 @@ function renderHistoryTable() {
   const tbody = document.getElementById('history-table-body');
   if (!tbody) return;
 
-  const search = document.getElementById('history-search-input')?.value.trim().toLowerCase() || '';
+  const search = (document.getElementById('history-search-input')?.value || '').trim().toLowerCase();
   const dateVal = document.getElementById('history-date-filter')?.value || '';
   const payVal = document.getElementById('history-payment-filter')?.value || 'all';
 
-  let list = state.bills;
+  let list = Array.isArray(state.bills) ? state.bills : [];
 
   if (search) {
-    list = list.filter(b => 
-      b.invoiceNumber.toLowerCase().includes(search) ||
-      b.customerName.toLowerCase().includes(search) ||
-      (b.customerPhone && b.customerPhone.includes(search))
-    );
+    list = list.filter(b => {
+      const inv = String(b.invoiceNumber || '').toLowerCase();
+      const cust = String(b.customerName || '').toLowerCase();
+      const phone = String(b.customerPhone || '');
+      return inv.includes(search) || cust.includes(search) || phone.includes(search);
+    });
   }
 
   if (dateVal) {
-    list = list.filter(b => b.createdAt.startsWith(dateVal));
+    list = list.filter(b => {
+      const dStr = String(b.createdAt || b.dateTime || '');
+      return dStr.startsWith(dateVal);
+    });
   }
 
   if (payVal !== 'all') {
-    list = list.filter(b => b.paymentMethod === payVal);
+    list = list.filter(b => String(b.paymentMethod || '').toLowerCase() === payVal.toLowerCase());
   }
 
   if (list.length === 0) {
@@ -3339,39 +3352,525 @@ function renderHistoryTable() {
   }
 
   tbody.innerHTML = list.map(bill => {
-    const totalQty = bill.items.reduce((s, i) => s + i.quantity, 0);
+    try {
+      const items = Array.isArray(bill.items) ? bill.items : [];
+      const totalQty = items.reduce((s, i) => s + (Number(i.quantity) || 0), 0);
+      const savings = Number(bill.totalCustomerSavings) || 0;
+      const grandTotal = Number(bill.grandTotal !== undefined ? bill.grandTotal : (bill.total !== undefined ? bill.total : 0)) || 0;
+      const totalMrp = Number(bill.totalMrp !== undefined ? bill.totalMrp : (grandTotal + savings)) || 0;
+      const invoiceNo = bill.invoiceNumber || 'INV-000';
+      const custName = bill.customerName || 'Cash Customer';
+      const dateStr = bill.createdAt || bill.dateTime || new Date().toISOString();
+      const payMethod = bill.paymentMethod || 'Cash';
+
+      return `
+        <tr>
+          <td><span class="invoice-badge">${escapeHtml(invoiceNo)}</span></td>
+          <td style="font-size: 12px; color: var(--text-muted);">${formatDateTime(dateStr)}</td>
+          <td>
+            <div style="font-weight: 600; color: var(--text-main);">${escapeHtml(custName)}</div>
+            ${bill.customerPhone ? `<div style="font-size: 11.5px; color: var(--text-muted);">📞 ${escapeHtml(bill.customerPhone)}</div>` : ''}
+          </td>
+          <td>${items.length} items (${totalQty} units)</td>
+          <td style="font-family: var(--font-mono);">${formatCurrency(totalMrp)}</td>
+          <td><span class="item-savings-pill font-bold">Saved ₹${savings.toFixed(2)}</span></td>
+          <td style="font-family: var(--font-mono); font-weight: 800; font-size: 14.5px; color: var(--primary);">${formatCurrency(grandTotal)}</td>
+          <td><span class="pay-badge ${payMethod}">${escapeHtml(payMethod)}</span></td>
+          <td>
+            <div class="table-actions">
+              <button class="action-icon-btn" title="Edit Bill" onclick="openEditBillModal('${bill.id}')" style="color: var(--primary);">
+                <i data-lucide="edit"></i>
+              </button>
+              <button class="action-icon-btn" title="View & Print Invoice" onclick="viewBillDetails('${bill.id}')">
+                <i data-lucide="printer"></i>
+              </button>
+              <button class="action-icon-btn" title="Share WhatsApp" onclick="shareExistingBill('${bill.id}')">
+                <i data-lucide="send"></i>
+              </button>
+            </div>
+          </td>
+        </tr>
+      `;
+    } catch (err) {
+      console.warn('Failed rendering bill row in history:', err, bill);
+      return '';
+    }
+  }).join('');
+
+  if (window.lucide) window.lucide.createIcons();
+}
+
+// ================= GROSS PROFIT MODULE =================
+const grossProfitFilter = {
+  preset: 'today',
+  fromDate: '',
+  toDate: '',
+  search: ''
+};
+
+function setupGrossProfit() {
+  const presetContainer = document.getElementById('profit-preset-container');
+  const fromDateInput = document.getElementById('profit-from-date');
+  const toDateInput = document.getElementById('profit-to-date');
+  const applyBtn = document.getElementById('profit-apply-date-btn');
+  const resetBtn = document.getElementById('profit-reset-date-btn');
+  const searchInput = document.getElementById('profit-search-input');
+  const exportBtn = document.getElementById('export-profit-csv-btn');
+
+  // Breakdown modal close handlers
+  document.getElementById('close-profit-breakdown-btn')?.addEventListener('click', closeProfitBreakdownModal);
+  document.getElementById('pb-close-bottom-btn')?.addEventListener('click', closeProfitBreakdownModal);
+  document.getElementById('profit-breakdown-modal')?.addEventListener('click', (e) => {
+    if (e.target.id === 'profit-breakdown-modal') closeProfitBreakdownModal();
+  });
+
+  // Preset filter pills click
+  presetContainer?.querySelectorAll('.profit-pill').forEach(btn => {
+    btn.addEventListener('click', () => {
+      presetContainer.querySelectorAll('.profit-pill').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+
+      grossProfitFilter.preset = btn.getAttribute('data-range') || 'today';
+      if (fromDateInput) fromDateInput.value = '';
+      if (toDateInput) toDateInput.value = '';
+      grossProfitFilter.fromDate = '';
+      grossProfitFilter.toDate = '';
+
+      renderGrossProfit();
+    });
+  });
+
+  // Custom date range button
+  applyBtn?.addEventListener('click', () => {
+    const fromVal = fromDateInput?.value || '';
+    const toVal = toDateInput?.value || '';
+    if (!fromVal && !toVal) {
+      showToast('Please select From or To date to filter', 'info');
+      return;
+    }
+    grossProfitFilter.preset = 'custom';
+    grossProfitFilter.fromDate = fromVal;
+    grossProfitFilter.toDate = toVal;
+
+    presetContainer?.querySelectorAll('.profit-pill').forEach(b => b.classList.remove('active'));
+    renderGrossProfit();
+  });
+
+  // Reset date button
+  resetBtn?.addEventListener('click', () => {
+    grossProfitFilter.preset = 'today';
+    grossProfitFilter.fromDate = '';
+    grossProfitFilter.toDate = '';
+    if (fromDateInput) fromDateInput.value = '';
+    if (toDateInput) toDateInput.value = '';
+
+    presetContainer?.querySelectorAll('.profit-pill').forEach(b => {
+      b.classList.toggle('active', b.getAttribute('data-range') === 'today');
+    });
+    renderGrossProfit();
+  });
+
+  // Search input
+  searchInput?.addEventListener('input', (e) => {
+    grossProfitFilter.search = e.target.value.trim().toLowerCase();
+    renderGrossProfit();
+  });
+
+  // Export CSV
+  exportBtn?.addEventListener('click', exportGrossProfitCsv);
+
+  renderGrossProfit();
+}
+
+function getBillDateYMD(bill) {
+  const raw = bill.createdAt || bill.dateTime;
+  if (!raw) return '';
+  const d = new Date(raw);
+  if (isNaN(d.getTime())) {
+    return String(raw).slice(0, 10);
+  }
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
+function calculateBillGrossProfit(bill) {
+  const salesAmount = Number(bill.grandTotal !== undefined ? bill.grandTotal : (bill.total !== undefined ? bill.total : 0)) || 0;
+  const items = Array.isArray(bill.items) ? bill.items : [];
+
+  let totalPurchaseCost = 0;
+  const itemBreakdowns = items.map(item => {
+    const qty = Number(item.quantity) || 1;
+    const rate = Number(item.rate !== undefined ? item.rate : 0);
+    const itemSaleTotal = Number(item.total !== undefined ? item.total : (rate * qty));
+
+    // Determine purchase cost rate
+    let purchaseRate = Number(item.costPrice || item.purchaseRate || 0);
+    if (!purchaseRate) {
+      const p = state.products.find(prod => 
+        (item.productId && prod.id === item.productId) ||
+        (item.barcode && prod.barcode === item.barcode) ||
+        (prod.name && item.name && prod.name.toLowerCase() === item.name.toLowerCase())
+      );
+      if (p && (p.costPrice || p.purchaseRate)) {
+        purchaseRate = Number(p.costPrice || p.purchaseRate);
+      }
+    }
+
+    // Realistic wholesale retail estimate if not explicitly specified
+    if (!purchaseRate || purchaseRate <= 0) {
+      const mrp = Number(item.mrp || rate);
+      purchaseRate = rate > 0 ? (rate * 0.75) : (mrp * 0.70);
+    }
+    purchaseRate = Math.round(purchaseRate * 100) / 100;
+
+    const itemCostTotal = purchaseRate * qty;
+    const itemProfit = itemSaleTotal - itemCostTotal;
+    const itemMargin = itemSaleTotal > 0 ? ((itemProfit / itemSaleTotal) * 100) : 0;
+
+    totalPurchaseCost += itemCostTotal;
+
+    return {
+      productId: item.productId || item.id || '',
+      name: item.name || 'Product Item',
+      barcode: item.barcode || '',
+      quantity: qty,
+      unit: item.unit || 'Pcs',
+      rate: rate,
+      purchaseRate: purchaseRate,
+      saleTotal: itemSaleTotal,
+      costTotal: itemCostTotal,
+      profit: itemProfit,
+      margin: itemMargin
+    };
+  });
+
+  const grossProfit = salesAmount - totalPurchaseCost;
+  const marginPct = salesAmount > 0 ? ((grossProfit / salesAmount) * 100) : 0;
+
+  return {
+    salesAmount,
+    totalPurchaseCost,
+    grossProfit,
+    marginPct,
+    itemBreakdowns
+  };
+}
+
+function renderGrossProfit() {
+  const tbody = document.getElementById('profit-table-body');
+  const tfoot = document.getElementById('profit-table-foot');
+  if (!tbody) return;
+
+  const now = new Date();
+  const pad = (n) => String(n).padStart(2, '0');
+  const todayYmd = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+
+  const getYmdDaysAgo = (days) => {
+    const d = new Date(now.getTime() - days * 86400000);
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  };
+
+  const yestYmd = getYmdDaysAgo(1);
+  const sevenDaysYmd = getYmdDaysAgo(7);
+  const fourteenDaysYmd = getYmdDaysAgo(14);
+  const thirtyDaysYmd = getYmdDaysAgo(30);
+
+  let list = Array.isArray(state.bills) ? [...state.bills] : [];
+
+  // Filter by Preset or Custom Date Range
+  let rangeLabel = 'Today';
+  if (grossProfitFilter.preset === 'today') {
+    rangeLabel = 'Today';
+    list = list.filter(b => getBillDateYMD(b) === todayYmd);
+  } else if (grossProfitFilter.preset === 'yesterday') {
+    rangeLabel = 'Yesterday';
+    list = list.filter(b => getBillDateYMD(b) === yestYmd);
+  } else if (grossProfitFilter.preset === '7days') {
+    rangeLabel = 'Last 7 Days';
+    list = list.filter(b => {
+      const d = getBillDateYMD(b);
+      return d >= sevenDaysYmd && d <= todayYmd;
+    });
+  } else if (grossProfitFilter.preset === '14days') {
+    rangeLabel = 'Last 14 Days';
+    list = list.filter(b => {
+      const d = getBillDateYMD(b);
+      return d >= fourteenDaysYmd && d <= todayYmd;
+    });
+  } else if (grossProfitFilter.preset === '30days') {
+    rangeLabel = 'Last 30 Days';
+    list = list.filter(b => {
+      const d = getBillDateYMD(b);
+      return d >= thirtyDaysYmd && d <= todayYmd;
+    });
+  } else if (grossProfitFilter.preset === 'custom') {
+    rangeLabel = `Custom Range (${grossProfitFilter.fromDate || 'Start'} to ${grossProfitFilter.toDate || 'Present'})`;
+    list = list.filter(b => {
+      const d = getBillDateYMD(b);
+      if (grossProfitFilter.fromDate && d < grossProfitFilter.fromDate) return false;
+      if (grossProfitFilter.toDate && d > grossProfitFilter.toDate) return false;
+      return true;
+    });
+  } else if (grossProfitFilter.preset === 'all') {
+    rangeLabel = 'All Time';
+  }
+
+  // Filter by search text
+  if (grossProfitFilter.search) {
+    const q = grossProfitFilter.search;
+    list = list.filter(b => {
+      const inv = String(b.invoiceNumber || '').toLowerCase();
+      const cust = String(b.customerName || '').toLowerCase();
+      const hasItem = Array.isArray(b.items) && b.items.some(i => (i.name || '').toLowerCase().includes(q));
+      return inv.includes(q) || cust.includes(q) || hasItem;
+    });
+  }
+
+  // Calculate aggregates
+  let totalSales = 0;
+  let totalCost = 0;
+
+  const rowsData = list.map(bill => {
+    const calc = calculateBillGrossProfit(bill);
+    totalSales += calc.salesAmount;
+    totalCost += calc.totalPurchaseCost;
+    return {
+      bill,
+      ...calc
+    };
+  });
+
+  const netGrossProfit = totalSales - totalCost;
+  const overallMargin = totalSales > 0 ? ((netGrossProfit / totalSales) * 100) : 0;
+
+  // Update KPI Cards
+  const kpiSalesEl = document.getElementById('profit-kpi-sales');
+  const kpiBillsCountEl = document.getElementById('profit-kpi-bills-count');
+  const kpiCostEl = document.getElementById('profit-kpi-cost');
+  const kpiProfitEl = document.getElementById('profit-kpi-profit');
+  const kpiProfitSubEl = document.getElementById('profit-kpi-profit-sub');
+  const kpiMarginEl = document.getElementById('profit-kpi-margin');
+  const kpiMarginBadgeEl = document.getElementById('profit-kpi-margin-badge');
+  const headingEl = document.getElementById('profit-table-range-heading');
+  const countEl = document.getElementById('profit-rows-count');
+
+  if (kpiSalesEl) kpiSalesEl.textContent = formatCurrency(totalSales);
+  if (kpiBillsCountEl) kpiBillsCountEl.textContent = `${rowsData.length} sales bills in ${rangeLabel}`;
+  if (kpiCostEl) kpiCostEl.textContent = formatCurrency(totalCost);
+  if (kpiProfitEl) {
+    kpiProfitEl.textContent = `${netGrossProfit >= 0 ? '+' : ''}${formatCurrency(netGrossProfit)}`;
+    kpiProfitEl.style.color = netGrossProfit >= 0 ? '#059669' : '#dc2626';
+  }
+  if (kpiProfitSubEl) {
+    kpiProfitSubEl.textContent = netGrossProfit >= 0 ? 'Net positive earnings' : 'Net deficit';
+  }
+  if (kpiMarginEl) kpiMarginEl.textContent = `${overallMargin.toFixed(1)}%`;
+  if (kpiMarginBadgeEl) {
+    let badgeClass = 'green';
+    let badgeText = 'Excellent Margin';
+    if (overallMargin < 10) {
+      badgeClass = 'red';
+      badgeText = 'Low Margin (< 10%)';
+    } else if (overallMargin < 20) {
+      badgeClass = 'amber';
+      badgeText = 'Moderate Margin';
+    }
+    kpiMarginBadgeEl.innerHTML = `<span class="margin-badge-pill ${badgeClass}">${badgeText}</span>`;
+  }
+  if (headingEl) headingEl.textContent = `Sales & Gross Profit List (${rangeLabel})`;
+  if (countEl) countEl.textContent = `${rowsData.length} Sales Invoices`;
+
+  // Populate Table Body
+  if (rowsData.length === 0) {
+    tbody.innerHTML = `
+      <tr>
+        <td colspan="9" style="text-align: center; padding: 36px; color: var(--text-muted);">
+          No sales bills found for <strong>${escapeHtml(rangeLabel)}</strong>.
+        </td>
+      </tr>
+    `;
+    if (tfoot) tfoot.innerHTML = '';
+    return;
+  }
+
+  tbody.innerHTML = rowsData.map(({ bill, salesAmount, totalPurchaseCost, grossProfit, marginPct }) => {
+    const items = Array.isArray(bill.items) ? bill.items : [];
+    const totalQty = items.reduce((s, i) => s + (Number(i.quantity) || 0), 0);
+    const invoiceNo = bill.invoiceNumber || 'INV-000';
+    const dateStr = bill.createdAt || bill.dateTime || new Date().toISOString();
+    const custName = bill.customerName || 'Cash Customer';
+    const isProfitPositive = grossProfit >= 0;
+
+    let marginBadgeClass = 'green';
+    if (marginPct < 10) marginBadgeClass = 'red';
+    else if (marginPct < 20) marginBadgeClass = 'amber';
+
     return `
       <tr>
-        <td><span class="invoice-badge">${escapeHtml(bill.invoiceNumber)}</span></td>
-        <td style="font-size: 12px; color: var(--text-muted);">${formatDateTime(bill.createdAt)}</td>
+        <td><span class="invoice-badge">${escapeHtml(invoiceNo)}</span></td>
+        <td style="font-size: 12px; color: var(--text-muted);">${formatDateTime(dateStr)}</td>
         <td>
-          <div style="font-weight: 600; color: var(--text-main);">${escapeHtml(bill.customerName)}</div>
+          <div style="font-weight: 600; color: var(--text-main);">${escapeHtml(custName)}</div>
           ${bill.customerPhone ? `<div style="font-size: 11.5px; color: var(--text-muted);">📞 ${escapeHtml(bill.customerPhone)}</div>` : ''}
         </td>
-        <td>${bill.items.length} items (${totalQty} units)</td>
-        <td style="font-family: var(--font-mono);">${formatCurrency(bill.totalMrp)}</td>
-        <td><span class="item-savings-pill font-bold">Saved ₹${bill.totalCustomerSavings.toFixed(2)}</span></td>
-        <td style="font-family: var(--font-mono); font-weight: 800; font-size: 14.5px; color: var(--primary);">${formatCurrency(bill.grandTotal)}</td>
-        <td><span class="pay-badge ${bill.paymentMethod}">${bill.paymentMethod}</span></td>
-        <td>
-          <div class="table-actions">
-            <button class="action-icon-btn" title="Edit Bill" onclick="openEditBillModal('${bill.id}')" style="color: var(--primary);">
-              <i data-lucide="edit"></i>
-            </button>
-            <button class="action-icon-btn" title="View & Print Invoice" onclick="viewBillDetails('${bill.id}')">
-              <i data-lucide="printer"></i>
-            </button>
-            <button class="action-icon-btn" title="Share WhatsApp" onclick="shareExistingBill('${bill.id}')">
-              <i data-lucide="send"></i>
-            </button>
-          </div>
+        <td style="font-size: 12px;">${items.length} items (${totalQty} units)</td>
+        <td style="text-align: right;" class="profit-cell-val">${formatCurrency(salesAmount)}</td>
+        <td style="text-align: right;" class="profit-cell-cost">${formatCurrency(totalPurchaseCost)}</td>
+        <td style="text-align: right; font-weight: 800; color: ${isProfitPositive ? '#059669' : '#dc2626'};" class="profit-cell-profit">
+          ${isProfitPositive ? '+' : ''}${formatCurrency(grossProfit)}
+        </td>
+        <td style="text-align: center;">
+          <span class="margin-badge-pill ${marginBadgeClass}">${marginPct.toFixed(1)}%</span>
+        </td>
+        <td style="text-align: center;">
+          <button type="button" class="btn-view-profit-breakdown" onclick="openProfitBreakdownModal('${bill.id}')" title="View individual item purchase rates and profit">
+            <i data-lucide="layers"></i>
+            <span>Breakdown</span>
+          </button>
         </td>
       </tr>
     `;
   }).join('');
 
+  // Populate Table Footer Totals
+  if (tfoot) {
+    tfoot.innerHTML = `
+      <tr>
+        <td colspan="4" style="font-weight: 800; font-size: 13.5px; color: var(--text-main);">
+          Total Summary (${rowsData.length} bills in ${escapeHtml(rangeLabel)})
+        </td>
+        <td style="text-align: right; color: var(--primary); font-size: 14.5px;">${formatCurrency(totalSales)}</td>
+        <td style="text-align: right; color: #b45309; font-size: 14.5px;">${formatCurrency(totalCost)}</td>
+        <td style="text-align: right; color: ${netGrossProfit >= 0 ? '#059669' : '#dc2626'}; font-size: 15px;">
+          ${netGrossProfit >= 0 ? '+' : ''}${formatCurrency(netGrossProfit)}
+        </td>
+        <td style="text-align: center;">
+          <span class="margin-badge-pill ${overallMargin >= 20 ? 'green' : (overallMargin >= 10 ? 'amber' : 'red')}">
+            ${overallMargin.toFixed(1)}%
+          </span>
+        </td>
+        <td style="text-align: center; color: var(--text-muted); font-size: 11.5px;">Net Margin</td>
+      </tr>
+    `;
+  }
+
   if (window.lucide) window.lucide.createIcons();
 }
+
+function openProfitBreakdownModal(billId) {
+  const bill = state.bills.find(b => b.id === billId);
+  if (!bill) {
+    showToast('Sale record not found!', 'error');
+    return;
+  }
+
+  const calc = calculateBillGrossProfit(bill);
+  const modal = document.getElementById('profit-breakdown-modal');
+  if (!modal) return;
+
+  const titleEl = document.getElementById('pb-invoice-title');
+  const metaEl = document.getElementById('pb-meta-subtitle');
+  const salesEl = document.getElementById('pb-kpi-sales');
+  const costEl = document.getElementById('pb-kpi-cost');
+  const profitEl = document.getElementById('pb-kpi-profit');
+  const marginEl = document.getElementById('pb-kpi-margin');
+  const tbody = document.getElementById('pb-items-tbody');
+  const printBtn = document.getElementById('pb-print-invoice-btn');
+
+  if (titleEl) titleEl.textContent = `${bill.invoiceNumber} - Gross Profit Breakdown`;
+  if (metaEl) {
+    metaEl.textContent = `Customer: ${bill.customerName || 'Cash Customer'} • Date: ${formatDateTime(bill.createdAt || bill.dateTime)}`;
+  }
+  if (salesEl) salesEl.textContent = formatCurrency(calc.salesAmount);
+  if (costEl) costEl.textContent = formatCurrency(calc.totalPurchaseCost);
+  if (profitEl) {
+    profitEl.textContent = `${calc.grossProfit >= 0 ? '+' : ''}${formatCurrency(calc.grossProfit)}`;
+    profitEl.style.color = calc.grossProfit >= 0 ? '#059669' : '#dc2626';
+  }
+  if (marginEl) marginEl.textContent = `${calc.marginPct.toFixed(1)}%`;
+
+  if (tbody) {
+    if (calc.itemBreakdowns.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="9" style="text-align:center; padding:20px; color:var(--text-muted);">No items recorded in this bill.</td></tr>`;
+    } else {
+      tbody.innerHTML = calc.itemBreakdowns.map((item, idx) => {
+        const isPos = item.profit >= 0;
+        let marginClass = 'green';
+        if (item.margin < 10) marginClass = 'red';
+        else if (item.margin < 20) marginClass = 'amber';
+
+        return `
+          <tr>
+            <td>${idx + 1}</td>
+            <td>
+              <div style="font-weight:600; color:var(--text-main);">${escapeHtml(item.name)}</div>
+              ${item.barcode ? `<div style="font-size:11px; color:var(--text-muted);">${escapeHtml(item.barcode)}</div>` : ''}
+            </td>
+            <td style="text-align:center;">${item.quantity} ${item.unit || 'Pcs'}</td>
+            <td style="text-align:right; font-family:var(--font-mono);">${formatCurrency(item.rate)}</td>
+            <td style="text-align:right; font-family:var(--font-mono); color:#b45309;">${formatCurrency(item.purchaseRate)}</td>
+            <td style="text-align:right; font-family:var(--font-mono); font-weight:700;">${formatCurrency(item.saleTotal)}</td>
+            <td style="text-align:right; font-family:var(--font-mono); color:#b45309;">${formatCurrency(item.costTotal)}</td>
+            <td style="text-align:right; font-family:var(--font-mono); font-weight:800; color:${isPos ? '#059669' : '#dc2626'};">
+              ${isPos ? '+' : ''}${formatCurrency(item.profit)}
+            </td>
+            <td style="text-align:center;">
+              <span class="margin-badge-pill ${marginClass}">${item.margin.toFixed(1)}%</span>
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+  }
+
+  if (printBtn) {
+    printBtn.onclick = () => {
+      closeProfitBreakdownModal();
+      viewBillDetails(bill.id);
+    };
+  }
+
+  modal.classList.add('show');
+  if (window.lucide) window.lucide.createIcons();
+}
+
+function closeProfitBreakdownModal() {
+  const modal = document.getElementById('profit-breakdown-modal');
+  if (modal) modal.classList.remove('show');
+}
+
+function exportGrossProfitCsv() {
+  if (state.bills.length === 0) {
+    showToast('No sales records to export!', 'error');
+    return;
+  }
+
+  let csv = 'Invoice Number,Date & Time,Customer Name,Customer Phone,Items Count,Sales Amount (INR),Purchase Cost (INR),Gross Profit (INR),Margin %\n';
+
+  state.bills.forEach(bill => {
+    const calc = calculateBillGrossProfit(bill);
+    const dateStr = bill.createdAt || bill.dateTime || '';
+    const itemsCount = Array.isArray(bill.items) ? bill.items.length : 0;
+    const row = [
+      `"${bill.invoiceNumber || 'INV-000'}"`,
+      `"${dateStr}"`,
+      `"${(bill.customerName || 'Cash Customer').replace(/"/g, '""')}"`,
+      `"${bill.customerPhone || ''}"`,
+      itemsCount,
+      calc.salesAmount.toFixed(2),
+      calc.totalPurchaseCost.toFixed(2),
+      calc.grossProfit.toFixed(2),
+      `${calc.marginPct.toFixed(1)}%`
+    ];
+    csv += row.join(',') + '\n';
+  });
+
+  downloadFile(csv, `Super_Bachat_Bazzar_Gross_Profit_${new Date().toISOString().slice(0, 10)}.csv`, 'text/csv');
+  showToast('Gross Profit Report exported to CSV!', 'success');
+}
+
+window.openProfitBreakdownModal = openProfitBreakdownModal;
+window.closeProfitBreakdownModal = closeProfitBreakdownModal;
 
 let editingBillState = null;
 
@@ -3783,6 +4282,7 @@ function saveEditedBill() {
   renderInventoryTable();
   renderHistoryTable();
   renderAnalytics();
+  renderGrossProfit();
 
   closeEditBillModal();
   showToast(`Bill ${editingBillState.invoiceNumber} updated successfully!`, 'success');
@@ -3817,6 +4317,7 @@ function deleteCurrentEditingBill() {
   renderInventoryTable();
   renderHistoryTable();
   renderAnalytics();
+  renderGrossProfit();
 
   closeEditBillModal();
   showToast(`Bill ${editingBillState.invoiceNumber} deleted and stock restored.`, 'info');
@@ -3857,17 +4358,24 @@ function exportSalesCsv() {
 
   let csv = 'Invoice Number,Date Time,Customer Name,Customer Phone,Items Count,Total MRP,Store Discount,Grand Total,Customer Savings,Payment Method\n';
   state.bills.forEach(b => {
+    const items = Array.isArray(b.items) ? b.items : [];
+    const savings = Number(b.totalCustomerSavings) || 0;
+    const grandTotal = Number(b.grandTotal !== undefined ? b.grandTotal : (b.total !== undefined ? b.total : 0)) || 0;
+    const totalMrp = Number(b.totalMrp !== undefined ? b.totalMrp : (grandTotal + savings)) || 0;
+    const storeDiscount = Number(b.storeDiscount) || Math.max(0, totalMrp - grandTotal);
+    const dateStr = b.createdAt || b.dateTime || '';
+
     const row = [
-      `"${b.invoiceNumber}"`,
-      `"${b.createdAt}"`,
-      `"${(b.customerName || '').replace(/"/g, '""')}"`,
+      `"${b.invoiceNumber || 'INV-000'}"`,
+      `"${dateStr}"`,
+      `"${(b.customerName || 'Cash Customer').replace(/"/g, '""')}"`,
       `"${b.customerPhone || ''}"`,
-      b.items.length,
-      b.totalMrp,
-      b.storeDiscount,
-      b.grandTotal,
-      b.totalCustomerSavings,
-      `"${b.paymentMethod}"`
+      items.length,
+      totalMrp.toFixed(2),
+      storeDiscount.toFixed(2),
+      grandTotal.toFixed(2),
+      savings.toFixed(2),
+      `"${b.paymentMethod || 'Cash'}"`
     ];
     csv += row.join(',') + '\n';
   });
@@ -3883,27 +4391,42 @@ function setupAnalytics() {
 
 function renderAnalytics() {
   const todayStr = new Date().toISOString().slice(0, 10);
-  const todayBills = state.bills.filter(b => b.createdAt.startsWith(todayStr));
+  const todayBills = state.bills.filter(b => {
+    const dStr = String(b.createdAt || b.dateTime || '');
+    return dStr.startsWith(todayStr);
+  });
 
-  const todaySales = todayBills.reduce((s, b) => s + b.grandTotal, 0);
-  const todaySavings = todayBills.reduce((s, b) => s + b.totalCustomerSavings, 0);
-  const allTimeSales = state.bills.reduce((s, b) => s + b.grandTotal, 0);
+  const todaySales = todayBills.reduce((s, b) => s + (Number(b.grandTotal !== undefined ? b.grandTotal : b.total) || 0), 0);
+  const todaySavings = todayBills.reduce((s, b) => s + (Number(b.totalCustomerSavings) || 0), 0);
+  const allTimeSales = state.bills.reduce((s, b) => s + (Number(b.grandTotal !== undefined ? b.grandTotal : b.total) || 0), 0);
 
   const lowStockCount = state.products.filter(p => p.quantity < 10).length;
 
-  document.getElementById('metric-today-sales').textContent = formatCurrency(todaySales);
-  document.getElementById('metric-today-bills-count').textContent = `${todayBills.length} bills generated today`;
-  document.getElementById('metric-today-savings').textContent = formatCurrency(todaySavings);
-  document.getElementById('metric-total-products').textContent = state.products.length;
-  document.getElementById('metric-low-stock-count').textContent = `${lowStockCount} low stock alerts (<10)`;
-  document.getElementById('metric-alltime-sales').textContent = formatCurrency(allTimeSales);
-  document.getElementById('metric-alltime-bills').textContent = `${state.bills.length} all-time invoices`;
+  const todaySalesEl = document.getElementById('metric-today-sales');
+  const todayCountEl = document.getElementById('metric-today-bills-count');
+  const todaySavingsEl = document.getElementById('metric-today-savings');
+  const totalProdEl = document.getElementById('metric-total-products');
+  const lowStockEl = document.getElementById('metric-low-stock-count');
+  const allSalesEl = document.getElementById('metric-alltime-sales');
+  const allBillsEl = document.getElementById('metric-alltime-bills');
+
+  if (todaySalesEl) todaySalesEl.textContent = formatCurrency(todaySales);
+  if (todayCountEl) todayCountEl.textContent = `${todayBills.length} bills generated today`;
+  if (todaySavingsEl) todaySavingsEl.textContent = formatCurrency(todaySavings);
+  if (totalProdEl) totalProdEl.textContent = state.products.length;
+  if (lowStockEl) lowStockEl.textContent = `${lowStockCount} low stock alerts (<10)`;
+  if (allSalesEl) allSalesEl.textContent = formatCurrency(allTimeSales);
+  if (allBillsEl) allBillsEl.textContent = `${state.bills.length} all-time invoices`;
 
   // Payment Breakdown
   const payStats = { Cash: 0, UPI: 0, Card: 0, Credit: 0 };
   state.bills.forEach(b => {
-    if (payStats[b.paymentMethod] !== undefined) {
-      payStats[b.paymentMethod] += b.grandTotal;
+    const method = b.paymentMethod || 'Cash';
+    const amt = Number(b.grandTotal !== undefined ? b.grandTotal : b.total) || 0;
+    if (payStats[method] !== undefined) {
+      payStats[method] += amt;
+    } else {
+      payStats.Cash += amt;
     }
   });
 
