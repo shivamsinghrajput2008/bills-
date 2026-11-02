@@ -58,11 +58,11 @@ const STORAGE_KEYS = {
 };
 
 const DEFAULT_SETTINGS = {
-  storeName: 'SUPER BACHAT BAZZAR',
+  storeName: 'SUPER BACHAT BAZAR',
   storeAddress: 'attardah kachhi pakki , muzzafarpur',
   storePhone: '+91 98765 43210',
   storeUpi: 'superbachat@upi',
-  storeWishes: '🙏 Thank you for shopping with us! Visit again. Save More with Super Bachat Bazzar! 🙏'
+  storeWishes: '🙏 Thank you for shopping with us! Visit again. Save More with Super Bachat Bazar! 🙏'
 };
 
 const SAMPLE_PRODUCTS = [

@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>SUPER BACHAT BAZZAR - Modern Billing & Inventory POS</title>
-  <meta name="description" content="Fast, Modern Billing and Inventory Management Point of Sale System for Super Bachat Bazzar, Attardah Kachhi Pakki, Muzaffarpur.">
+  <title>SUPER BACHAT BAZAR - Modern Billing & Inventory POS</title>
+  <meta name="description" content="Fast, Modern Billing and Inventory Management Point of Sale System for Super Bachat Bazar, Attardah Kachhi Pakki, Muzaffarpur.">
   
   <!-- Modern Google Fonts: Outfit & Inter + JetBrains Mono for receipts -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -128,9 +128,9 @@
         </div>
 
         <div class="lock-store-badge" style="margin-bottom: 8px;">
-          <img src="store-photo.jpg" alt="Super Bachat Bazzar Store Front" class="lock-store-img">
+          <img src="store-photo.jpg" alt="Super Bachat Bazar Store Front" class="lock-store-img">
           <div class="lock-store-meta">
-            <h2 class="lock-store-name">SUPER BACHAT BAZZAR</h2>
+            <h2 class="lock-store-name">SUPER BACHAT BAZAR</h2>
             <span class="lock-store-sub"><i data-lucide="map-pin" class="mini-icon"></i> Attardah Kachhi Pakki, Muzaffarpur</span>
           </div>
         </div>
@@ -309,7 +309,7 @@
       </div>
       <div class="store-info-group">
         <div class="store-name-row">
-          <h1 class="store-title">SUPER BACHAT BAZZAR</h1>
+          <h1 class="store-title">SUPER BACHAT BAZAR</h1>
           <span class="pos-status-pill"><span class="pulse-dot"></span> POS LIVE</span>
         </div>
         <p class="store-subtitle"><i data-lucide="map-pin" class="mini-icon"></i> Attardah Kachhi Pakki, Muzaffarpur</p>
@@ -748,7 +748,7 @@
               </div>
             </div>
 
-            <div class="form-grid-4">
+            <div class="form-grid-3">
               <!-- Stock Quantity -->
               <div class="form-group">
                 <label for="prod-quantity" class="required">Stock Quantity</label>
@@ -780,7 +780,9 @@
                   <input type="number" id="prod-mrp" class="form-input" placeholder="0.00" min="0" step="0.5" required>
                 </div>
               </div>
+            </div>
 
+            <div class="form-grid-3">
               <!-- Selling Rate (GST Included) -->
               <div class="form-group">
                 <div class="label-with-action">
@@ -790,6 +792,24 @@
                 <div class="input-with-icon">
                   <i data-lucide="badge-percent"></i>
                   <input type="number" id="prod-rate" class="form-input" placeholder="0.00" min="0" step="0.5" required>
+                </div>
+              </div>
+
+              <!-- Purchase Cost Rate (Mandatory) -->
+              <div class="form-group">
+                <label for="prod-cost-price" class="required">Purchase Cost Rate (₹)</label>
+                <div class="input-with-icon">
+                  <i data-lucide="trending-down"></i>
+                  <input type="number" id="prod-cost-price" class="form-input" placeholder="Store cost price" min="0" step="0.5" required>
+                </div>
+              </div>
+
+              <!-- Product Expiry Date (Mandatory) -->
+              <div class="form-group">
+                <label for="prod-expiry-date" class="required">Product Expiry Date</label>
+                <div class="input-with-icon">
+                  <i data-lucide="calendar-off"></i>
+                  <input type="date" id="prod-expiry-date" class="form-input" required>
                 </div>
               </div>
             </div>
@@ -864,16 +884,7 @@
               </div>
             </div>
 
-            <div class="form-grid-3">
-              <!-- Purchase Cost Price (Optional, for profit tracking) -->
-              <div class="form-group">
-                <label for="prod-cost-price">Purchase Cost Rate (₹) <span class="optional-tag">Optional</span></label>
-                <div class="input-with-icon">
-                  <i data-lucide="trending-down"></i>
-                  <input type="number" id="prod-cost-price" class="form-input" placeholder="Store cost price" min="0" step="0.5">
-                </div>
-              </div>
-
+            <div class="form-grid-2">
               <!-- Shelf / Rack Location -->
               <div class="form-group">
                 <label for="prod-shelf">Shelf / Rack Location <span class="optional-tag">Optional</span></label>
@@ -1794,7 +1805,7 @@
           
           <!-- Store Header -->
           <div class="receipt-header">
-            <h1 class="receipt-store-name">SUPER BACHAT BAZZAR</h1>
+            <h1 class="receipt-store-name">SUPER BACHAT BAZAR</h1>
             <p class="receipt-store-address">attardah kachhi pakki , muzzafarpur</p>
             <p class="receipt-store-contact" id="receipt-contact-line">Mob: +91 98765 43210</p>
             <div class="receipt-type-pill">RETAIL TAX INVOICE / CASH MEMO</div>
@@ -1872,8 +1883,8 @@
             </div>
           </div>
 
-          <!-- GST Breakdown Summary on Receipt (Rate is GST Included) -->
-          <div class="receipt-gst-section" id="receipt-gst-breakdown-section">
+          <!-- GST Breakdown Summary on Receipt (Rate is GST Included - Hidden on Print as requested) -->
+          <div class="receipt-gst-section" id="receipt-gst-breakdown-section" style="display: none !important;">
             <div class="receipt-gst-title">GST Tax Breakdown (Included in Bill)</div>
             <table class="receipt-gst-table">
               <thead>

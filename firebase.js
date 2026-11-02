@@ -1201,7 +1201,7 @@ export function subscribeToSubscription(userId, onSubscriptionChanged, onError) 
   const docPath = `users/${userId}/subscriptions/current`;
   const docRef = doc(db, 'users', userId, 'subscriptions', 'current');
 
-  return onSnapshot(docPath, (docSnap) => {
+  return onSnapshot(docRef, (docSnap) => {
     if (docSnap.exists()) {
       onSubscriptionChanged(docSnap.data());
     } else {
