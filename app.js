@@ -2090,27 +2090,78 @@ function updateInvoicePreview() {
 }
 
 function handleBarcodeOrSearch(code) {
-  // Try exact match on barcode first
-  const product = state.products.find(p => p.barcode.toLowerCase() === code.toLowerCase() || p.id === code);
-  if (product) {
-    addToCart(product);
+  const query = code.toLowerCase().trim();
+  // Try exact match on barcode or id
+  const exactMatches = state.products.filter(p => (p.barcode && p.barcode.toLowerCase() === query) || p.id.toLowerCase() === query);
+  if (exactMatches.length === 1) {
+    addToCart(exactMatches[0]);
     playSound('scan');
+    return;
+  } else if (exactMatches.length > 1) {
+    openSharedBarcodeModal(exactMatches);
+    playSound('add');
     return;
   }
 
   // If not exact match, search by name substring
-  const matches = state.products.filter(p => p.name.toLowerCase().includes(code.toLowerCase()));
+  const matches = state.products.filter(p => p.name.toLowerCase().includes(query));
   if (matches.length === 1) {
     addToCart(matches[0]);
     playSound('scan');
   } else if (matches.length > 1) {
-    renderSearchSuggestions(code);
+    renderSearchSuggestions(query);
     playSound('add');
   } else {
     playSound('error');
     showToast(`No product found matching "${code}"`, 'error');
   }
 }
+
+function openSharedBarcodeModal(matches) {
+  const modal = document.getElementById('shared-barcode-modal');
+  const listEl = document.getElementById('shared-barcode-options-list');
+  if (!modal || !listEl) return;
+
+  listEl.innerHTML = matches.map(p => `
+    <div class="shared-variant-card" data-id="${p.id}" style="display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; background: var(--bg-subtle); border: 1px solid var(--border-color); border-radius: 10px; cursor: pointer; transition: all 0.15s ease;" onmouseover="this.style.borderColor='var(--primary)'" onmouseout="this.style.borderColor='var(--border-color)'">
+      <div>
+        <div style="font-weight: 700; color: var(--text-main); font-size: 14px;">${escapeHtml(p.name)}</div>
+        <div style="font-size: 12px; color: var(--text-muted); margin-top: 2px;">
+          <span>Category: ${escapeHtml(p.category)}</span> • 
+          <span>Stock: ${p.quantity} ${p.unit || 'Pcs'}</span> • 
+          <span style="font-family: var(--font-mono);">Barcode: ${escapeHtml(p.barcode)}</span>
+          ${p.expiryDate ? ` • <span style="color:#d97706;">Expiry: ${escapeHtml(p.expiryDate)}</span>` : ''}
+        </div>
+      </div>
+      <div style="text-align: right; flex-shrink: 0;">
+        <div style="font-family: var(--font-mono); font-weight: 800; font-size: 16px; color: var(--primary);">${formatCurrency(p.rate)}</div>
+        <div style="font-family: var(--font-mono); font-size: 12px; color: var(--text-muted); text-decoration: line-through;">MRP ${formatCurrency(p.mrp)}</div>
+      </div>
+    </div>
+  `).join('');
+
+  listEl.querySelectorAll('.shared-variant-card').forEach(card => {
+    card.addEventListener('click', () => {
+      const id = card.getAttribute('data-id');
+      const prod = state.products.find(p => p.id === id);
+      if (prod) {
+        addToCart(prod);
+        playSound('scan');
+        closeSharedBarcodeModal();
+      }
+    });
+  });
+
+  modal.classList.add('show');
+}
+
+function closeSharedBarcodeModal() {
+  const modal = document.getElementById('shared-barcode-modal');
+  if (modal) modal.classList.remove('show');
+}
+
+window.openSharedBarcodeModal = openSharedBarcodeModal;
+window.closeSharedBarcodeModal = closeSharedBarcodeModal;
 
 function renderSearchSuggestions(query) {
   const container = document.getElementById('search-suggestions');
@@ -2617,18 +2668,13 @@ function populatePrintReceipt(bill) {
   }
 
   const taxRow = document.getElementById('receipt-tax-row');
-  if (taxRow) {
-    if (bill.gstAmount > 0) {
-      taxRow.style.display = 'flex';
-      setEl('receipt-tax-val', formatCurrency(bill.gstAmount));
-    } else {
-      taxRow.style.display = 'none';
-    }
-  }
+  if (taxRow) taxRow.style.display = 'none';
+
+  const gstSection = document.getElementById('receipt-gst-breakdown-section');
+  if (gstSection) gstSection.style.display = 'none';
 
   // Populate GST Tax Summary Table on Receipt (Rate is GST Included)
   const gstTbody = document.getElementById('receipt-gst-tbody');
-  const gstSection = document.getElementById('receipt-gst-breakdown-section');
   if (gstTbody) {
     const slabs = {};
     (bill.items || []).forEach(item => {
@@ -2876,13 +2922,14 @@ function setupInwardInventory() {
     const mrp = parseFloat(document.getElementById('prod-mrp')?.value) || 0;
     const rate = parseFloat(document.getElementById('prod-rate')?.value) || 0;
     const costPrice = parseFloat(document.getElementById('prod-cost-price')?.value) || 0;
+    const expiryDate = document.getElementById('prod-expiry-date')?.value || '';
     const shelf = document.getElementById('prod-shelf')?.value.trim() || '';
     const gstRate = getSelectedGstRate();
     const hsn = hsnInput?.value.trim() || '';
     const gstType = gstTypeInput?.value || 'inclusive';
 
-    if (!name || !barcode) {
-      showToast('Please fill all required product fields!', 'error');
+    if (!name || !barcode || isNaN(costPrice) || costPrice <= 0 || !expiryDate) {
+      showToast('Please fill all required fields including Purchase Cost Rate and Product Expiry Date!', 'error');
       return;
     }
 
@@ -2899,11 +2946,12 @@ function setupInwardInventory() {
         prod.mrp = mrp;
         prod.rate = rate;
         prod.costPrice = costPrice;
+        prod.expiryDate = expiryDate;
         prod.shelf = shelf;
         prod.gstRate = gstRate;
         prod.gstType = gstType;
         prod.hsn = hsn;
-        showToast('Product updated successfully with GST!', 'success');
+        showToast('Product updated successfully!', 'success');
       }
     } else {
       // Check duplicate barcode
@@ -2914,6 +2962,8 @@ function setupInwardInventory() {
           existing.inwardDateTime = inwardDateTime;
           existing.mrp = mrp;
           existing.rate = rate;
+          existing.costPrice = costPrice;
+          existing.expiryDate = expiryDate;
           existing.gstRate = gstRate;
           existing.gstType = gstType;
           existing.hsn = hsn;
@@ -2921,7 +2971,7 @@ function setupInwardInventory() {
           renderInventoryTable();
           renderQuickItems();
           resetInwardForm();
-          showToast(`Updated stock & GST for ${existing.name}!`, 'success');
+          showToast(`Updated stock for ${existing.name}!`, 'success');
           return;
         }
       }
@@ -2938,6 +2988,7 @@ function setupInwardInventory() {
         mrp,
         rate,
         costPrice,
+        expiryDate,
         shelf,
         gstRate,
         gstType,
@@ -3045,6 +3096,7 @@ function editProduct(id) {
   document.getElementById('prod-mrp').value = prod.mrp;
   document.getElementById('prod-rate').value = prod.rate;
   document.getElementById('prod-cost-price').value = prod.costPrice || '';
+  document.getElementById('prod-expiry-date').value = prod.expiryDate || '';
   document.getElementById('prod-shelf').value = prod.shelf || '';
 
   const gstSelect = document.getElementById('prod-gst-rate');

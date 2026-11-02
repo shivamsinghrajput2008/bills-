@@ -6148,3 +6148,63 @@ body.theme-dark .pw-qr-split {
   height: 13px;
 }
 
+
+/* ================= THERMAL RECEIPT PRINT STYLING ================= */
+@media print {
+  body * {
+    visibility: hidden !important;
+  }
+  #printable-receipt, #printable-receipt * {
+    visibility: visible !important;
+  }
+  #printable-receipt {
+    position: absolute !important;
+    left: 0 !important;
+    top: 0 !important;
+    width: 100% !important;
+    font-size: 15px !important;
+    font-weight: 800 !important;
+    color: #000000 !important;
+    background: #ffffff !important;
+    padding: 12px !important;
+    line-height: 1.4 !important;
+  }
+  .receipt-store-name {
+    font-size: 24px !important;
+    font-weight: 900 !important;
+    color: #000000 !important;
+  }
+  .receipt-store-address, .receipt-store-contact, .receipt-type-pill {
+    font-size: 13px !important;
+    font-weight: 700 !important;
+    color: #000000 !important;
+  }
+  .receipt-meta-grid div, .receipt-meta-grid span {
+    font-size: 13px !important;
+    font-weight: 700 !important;
+    color: #000000 !important;
+  }
+  .receipt-items-table th, .receipt-items-table td {
+    font-size: 13px !important;
+    font-weight: 800 !important;
+    color: #000000 !important;
+  }
+  .receipt-totals-table span, .receipt-totals-table strong, .receipt-totals-table div {
+    font-size: 14px !important;
+    font-weight: 900 !important;
+    color: #000000 !important;
+  }
+  .receipt-gst-section {
+    display: none !important;
+  }
+  .receipt-savings-box {
+    font-size: 14px !important;
+    font-weight: 900 !important;
+    border: 2px solid #000 !important;
+    color: #000 !important;
+    background: #fff !important;
+  }
+  .modal-backdrop, .app-header, .shortcut-bar, main {
+    display: none !important;
+  }
+}
